@@ -293,6 +293,7 @@
 
     function showNav() {
         nav.classList.remove('hidden');
+        nav.classList.remove('nav-open');
         document.body.classList.add('has-nav');
         updateNavScore();
         updateActiveNav();
@@ -300,8 +301,16 @@
 
     function hideNav() {
         nav.classList.add('hidden');
+        nav.classList.remove('nav-open');
         document.body.classList.remove('has-nav');
     }
+
+    // Close mobile nav when a link is clicked
+    nav.addEventListener('click', function(e) {
+        if (e.target.closest('.nav-links a')) {
+            nav.classList.remove('nav-open');
+        }
+    });
 
     function updateNavScore() {
         var el = document.getElementById('nav-score');
@@ -423,6 +432,9 @@
             case 'review-missed':
                 startQuiz('missed');
                 break;
+            case 'timed-test':
+                startQuiz('timed');
+                break;
             case 'strategies':
                 renderStrategies();
                 break;
@@ -526,12 +538,13 @@
         questions: [],
         currentIndex: 0,
         answers: [],
-        mode: '',       // 'diagnostic', 'practice', 'missed', 'weakness'
+        mode: '',       // 'diagnostic', 'practice', 'missed', 'weakness', 'timed'
         selectedChoice: null,
         answered: false,
         timerInterval: null,
         timeElapsed: 0,
-        startTime: null
+        startTime: null,
+        timeLimit: 0        // seconds, 0 = no limit
     };
 
     function startQuiz(mode) {
@@ -548,6 +561,7 @@
         quizState.answered = false;
         quizState.timeElapsed = 0;
         quizState.startTime = Date.now();
+        quizState.timeLimit = 0;
 
         if (quizState.timerInterval) clearInterval(quizState.timerInterval);
 
@@ -557,7 +571,12 @@
                 break;
             case 'practice':
                 var opts = window._practiceOptions || { topic: 'all', count: 10, difficulty: 'all', unansweredFirst: true };
-                quizState.questions = buildPracticeSet(opts);
+                if (opts._override && opts._override.length > 0) {
+                    quizState.questions = opts._override;
+                    delete opts._override;
+                } else {
+                    quizState.questions = buildPracticeSet(opts);
+                }
                 break;
             case 'weakness':
                 quizState.questions = buildWeaknessSet();
@@ -565,6 +584,13 @@
             case 'missed':
                 var missed = getMissedQuestions();
                 quizState.questions = shuffleArray(missed).slice(0, 15);
+                break;
+            case 'timed':
+                // Full SAT-style timed section: 44 questions, 70 minutes
+                var timedOpts = window._practiceOptions || { topic: 'all', count: 44, difficulty: 'all', unansweredFirst: true };
+                timedOpts.count = 44;
+                quizState.questions = buildPracticeSet(timedOpts);
+                quizState.timeLimit = 70 * 60; // 70 minutes in seconds
                 break;
         }
 
@@ -584,7 +610,20 @@
         quizState.timerInterval = setInterval(function() {
             quizState.timeElapsed = Math.floor((Date.now() - quizState.startTime) / 1000);
             var timerEl = document.getElementById('quiz-timer');
-            if (timerEl) {
+            if (!timerEl) return;
+
+            if (quizState.timeLimit > 0) {
+                // Countdown timer for timed mode
+                var remaining = Math.max(0, quizState.timeLimit - quizState.timeElapsed);
+                timerEl.textContent = formatTime(remaining);
+                timerEl.className = 'quiz-timer countdown';
+                if (remaining <= 60) timerEl.className += ' danger';
+                else if (remaining <= 300) timerEl.className += ' warning';
+                // Auto-finish when time runs out
+                if (remaining === 0) {
+                    finishQuiz();
+                }
+            } else {
                 timerEl.textContent = formatTime(quizState.timeElapsed);
                 var perQ = quizState.timeElapsed / (quizState.currentIndex + 1);
                 if (perQ > 120) timerEl.className = 'quiz-timer danger';
@@ -674,6 +713,38 @@
         var submitBtn = document.getElementById('submit-btn');
         if (submitBtn) submitBtn.disabled = false;
     };
+
+    // Keyboard shortcuts for quiz: A/B/C/D to select, Enter to submit/next
+    document.addEventListener('keydown', function(e) {
+        // Only active during quiz
+        if (!quizState.questions || quizState.questions.length === 0) return;
+        var q = quizState.questions[quizState.currentIndex];
+        if (!q) return;
+
+        var key = e.key.toLowerCase();
+
+        if (q.type === 'mc' && !quizState.answered) {
+            var keyMap = { 'a': 0, 'b': 1, 'c': 2, 'd': 3, '1': 0, '2': 1, '3': 2, '4': 3 };
+            if (keyMap[key] !== undefined && keyMap[key] < (q.choices || []).length) {
+                e.preventDefault();
+                window.selectChoice(keyMap[key]);
+            }
+        }
+
+        if (key === 'enter') {
+            e.preventDefault();
+            if (quizState.answered) {
+                if (quizState.currentIndex < quizState.questions.length - 1) {
+                    window.nextQuestion();
+                } else {
+                    finishQuiz();
+                }
+            } else if (q.type === 'mc' && quizState.selectedChoice !== null) {
+                window.submitAnswer();
+            }
+            // Grid-in Enter is handled by the input's onkeydown
+        }
+    });
 
     window.submitAnswer = function() {
         if (quizState.answered || quizState.selectedChoice === null) return;
@@ -1229,7 +1300,23 @@
     }
 
     window.practiceFromLesson = function(topic, lessonId) {
-        window._practiceOptions = { topic: topic, count: 10, difficulty: 'all', unansweredFirst: true };
+        // Use the lesson's questionIds to build a targeted practice set
+        var lesson = getLessons().filter(function(l) { return l.id === lessonId; })[0];
+        if (lesson && lesson.questionIds && lesson.questionIds.length > 0) {
+            var lessonQs = getQuestions().filter(function(q) {
+                return lesson.questionIds.indexOf(q.id) !== -1;
+            });
+            // Also add more from same topic to reach 10
+            if (lessonQs.length < 10) {
+                var topicQs = getQuestionsByTopic(topic).filter(function(q) {
+                    return lesson.questionIds.indexOf(q.id) === -1;
+                });
+                lessonQs = lessonQs.concat(shuffleArray(topicQs).slice(0, 10 - lessonQs.length));
+            }
+            window._practiceOptions = { topic: topic, count: 10, difficulty: 'all', unansweredFirst: true, _override: lessonQs };
+        } else {
+            window._practiceOptions = { topic: topic, count: 10, difficulty: 'all', unansweredFirst: true };
+        }
         window.location.hash = '#/start-practice';
     };
 
@@ -1289,9 +1376,14 @@
                     '<button class="btn btn-primary btn-lg" onclick="launchPractice()">Start Practice</button>' +
                 '</div>' +
             '</div>' +
-            '<div style="margin-top:24px;display:flex;gap:12px;justify-content:center">' +
+            '<div style="margin-top:24px;display:flex;gap:12px;justify-content:center;flex-wrap:wrap">' +
                 '<button class="btn btn-secondary" onclick="window.location.hash=\'#/weakness-drill\'">Weakness Drill (Auto)</button>' +
                 '<button class="btn btn-secondary" onclick="window.location.hash=\'#/review-missed\'">Review Missed Questions</button>' +
+            '</div>' +
+            '<div class="card card-padded" style="margin-top:24px;text-align:center">' +
+                '<h3 style="margin-bottom:8px">Simulate Test Conditions</h3>' +
+                '<p style="color:var(--gray-500);font-size:14px;margin-bottom:16px">44 questions, 70-minute countdown &mdash; just like the real SAT Math section.</p>' +
+                '<button class="btn btn-success btn-lg" onclick="window.location.hash=\'#/timed-test\'">Start Timed Test</button>' +
             '</div>' +
         '</div>';
 

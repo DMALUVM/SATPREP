@@ -1707,19 +1707,107 @@ body.has-nav #app {
     margin-bottom: 24px;
 }
 
+/* ===== HAMBURGER MENU ===== */
+.hamburger {
+    display: none;
+    flex-direction: column;
+    gap: 5px;
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 8px;
+    z-index: 101;
+}
+
+.hamburger span {
+    display: block;
+    width: 22px;
+    height: 2px;
+    background: var(--gray-700);
+    border-radius: 2px;
+    transition: var(--transition);
+}
+
+.nav-open .hamburger span:nth-child(1) {
+    transform: rotate(45deg) translate(5px, 5px);
+}
+
+.nav-open .hamburger span:nth-child(2) {
+    opacity: 0;
+}
+
+.nav-open .hamburger span:nth-child(3) {
+    transform: rotate(-45deg) translate(5px, -5px);
+}
+
+/* ===== KEYBOARD SHORTCUT HINTS ===== */
+.choice-btn .choice-key-hint {
+    display: none;
+}
+
+@media (min-width: 769px) {
+    .choice-btn .choice-key-hint {
+        display: inline;
+        font-size: 11px;
+        color: var(--gray-400);
+        margin-left: auto;
+        padding-left: 12px;
+    }
+}
+
+/* ===== TIMED MODE WARNING ===== */
+.timed-warning {
+    padding: 12px 16px;
+    background: var(--warning-bg);
+    border: 1px solid #fde68a;
+    border-radius: var(--radius-sm);
+    font-size: 14px;
+    color: #854d0e;
+    margin-top: 16px;
+    text-align: center;
+}
+
+.quiz-timer.countdown {
+    font-size: 17px;
+    font-weight: 700;
+}
+
 /* ===== RESPONSIVE ===== */
 @media (max-width: 768px) {
+    .hamburger {
+        display: flex;
+    }
+
     .nav-inner {
         padding: 0 16px;
+        flex-wrap: wrap;
+    }
+
+    .nav-links {
+        display: none;
+        width: 100%;
+        flex-direction: column;
+        padding: 8px 0 16px;
+        gap: 0;
+    }
+
+    .nav-open .nav-links {
+        display: flex;
+    }
+
+    .nav-links a {
+        padding: 12px 16px;
+        font-size: 15px;
+        border-radius: 0;
+        border-bottom: 1px solid var(--gray-100);
     }
 
     .nav-links a span.nav-icon {
         display: none;
     }
 
-    .nav-links a {
-        padding: 8px 10px;
-        font-size: 13px;
+    .nav-score {
+        margin-left: auto;
     }
 
     .dashboard-grid {
@@ -1753,6 +1841,14 @@ body.has-nav #app {
     .score-arrow {
         transform: rotate(90deg);
     }
+
+    .welcome-logo {
+        font-size: 40px;
+    }
+
+    .welcome-card {
+        padding: 28px 20px;
+    }
 }
 
 @media (max-width: 480px) {
@@ -1766,6 +1862,10 @@ body.has-nav #app {
 
     .quiz-progress-bar {
         width: 100px;
+    }
+
+    .config-options {
+        grid-template-columns: 1fr 1fr;
     }
 }
 

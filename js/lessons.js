@@ -34,7 +34,7 @@ window.SAT_LESSONS = [
             "Parallel lines: same slope",
             "Perpendicular lines: slopes are negative reciprocals ($m_1 \\cdot m_2 = -1$)"
         ],
-        questionIds: ["alg-lf-001", "alg-lf-002", "alg-lf-003", "alg-lf-004", "alg-lf-005"]
+        questionIds: ["alg-fun-001", "alg-fun-002", "alg-fun-003", "alg-fun-004", "alg-fun-005"]
     },
     {
         id: "systems",
@@ -102,7 +102,7 @@ window.SAT_LESSONS = [
             "Vertex form: $y = a(x - h)^2 + k$, vertex is $(h, k)$",
             "Vertex x-coordinate from standard form: $x = -\\frac{b}{2a}$"
         ],
-        questionIds: ["am-quad-001", "am-quad-002", "am-quad-003", "am-quad-004", "am-quad-005"]
+        questionIds: ["adv-quad-001", "adv-quad-002", "adv-quad-003", "adv-quad-004", "adv-quad-005"]
     },
     {
         id: "exponents-functions",
@@ -120,7 +120,7 @@ window.SAT_LESSONS = [
             "FOIL: $(a+b)(c+d) = ac + ad + bc + bd$",
             "$f(x)$ means substitute $x$ into the function rule"
         ],
-        questionIds: ["am-exp-001", "am-exp-002", "am-exp-003", "am-func-001", "am-func-002"]
+        questionIds: ["adv-exp-001", "adv-exp-002", "adv-exp-003", "adv-func-001", "adv-func-002"]
     },
     {
         id: "geometry-essentials",
@@ -156,7 +156,7 @@ window.SAT_LESSONS = [
             "Cone volume: $V = \\frac{1}{3}\\pi r^2 h$",
             "Sphere volume: $V = \\frac{4}{3}\\pi r^3$"
         ],
-        questionIds: ["geo-cir-001", "geo-cir-002", "geo-cir-003", "geo-vol-001", "geo-vol-002"]
+        questionIds: ["geo-circ-001", "geo-circ-002", "geo-circ-003", "geo-vol-001", "geo-vol-002"]
     },
     {
         id: "probability-advanced",
@@ -175,6 +175,6 @@ window.SAT_LESSONS = [
             "TOA: $\\tan = \\frac{\\text{Opposite}}{\\text{Adjacent}}$",
             "Absolute value: $|ax + b| = c$ gives two equations"
         ],
-        questionIds: ["ps-prob-001", "ps-prob-002", "ps-prob-003", "am-exp-006", "am-exp-007"]
+        questionIds: ["ps-prob-001", "ps-prob-002", "ps-prob-003", "adv-exp-006", "adv-exp-007"]
     }
 ];
