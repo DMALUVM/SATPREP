@@ -20,7 +20,7 @@ export default function NavBar({ route, navigate, role, onSignOut }) {
       <div className="sat-nav__brand" onClick={() => navigate('/daily')}>
         <span className="sat-nav__badge">SAT</span>
         <div>
-          <div className="sat-nav__title">Math 1300+ Accelerator</div>
+          <div className="sat-nav__title">Math + Verbal 1300+</div>
           <div className="sat-nav__subtitle">4-week mission</div>
         </div>
       </div>

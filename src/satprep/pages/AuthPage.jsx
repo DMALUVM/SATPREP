@@ -33,11 +33,11 @@ export default function AuthPage() {
   return (
     <main className="sat-auth">
       <section className="sat-auth__panel">
-        <div className="sat-auth__eyebrow">SAT Math 1300+ Accelerator</div>
+        <div className="sat-auth__eyebrow">SAT Math + Verbal 1300+ Accelerator</div>
         <h1>Sign in to start the 4-week score climb</h1>
         <p>
-          Student and parent each use their own email magic link account. Sessions, attempts, mastery, and
-          weekly reports sync to cloud.
+          Student and parent each use their own email magic link account. Math + verbal sessions, attempts,
+          mastery, and weekly reports sync to cloud.
         </p>
         <form onSubmit={sendMagicLink} className="sat-auth__form">
           <label>
@@ -61,7 +61,9 @@ export default function AuthPage() {
         <ul className="sat-auth__list">
           <li>Plan start date: Sunday, February 22, 2026</li>
           <li>Daily target: 45-60 focused minutes</li>
-          <li>Math score target: 650+ within four weeks</li>
+          <li>Math target: 650-700 in four weeks</li>
+          <li>Verbal target: 680-720 in four weeks</li>
+          <li>Combined target: 1300+ total score</li>
         </ul>
       </section>
     </main>
