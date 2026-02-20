@@ -276,16 +276,20 @@
 
     function renderMath() {
         if (typeof renderMathInElement === 'function') {
+            var mathOpts = {
+                delimiters: [
+                    {left: '$$', right: '$$', display: true},
+                    {left: '$', right: '$', display: false}
+                ],
+                throwOnError: false
+            };
             try {
-                renderMathInElement(app, {
-                    delimiters: [
-                        {left: '$$', right: '$$', display: true},
-                        {left: '$', right: '$', display: false}
-                    ],
-                    throwOnError: false
-                });
+                renderMathInElement(app, mathOpts);
+                // Also render in modal if it's visible
+                if (!modalOverlay.classList.contains('hidden')) {
+                    renderMathInElement(modalContent, mathOpts);
+                }
             } catch(e) {
-                // KaTeX not loaded yet, try again shortly
                 setTimeout(renderMath, 500);
             }
         }
@@ -721,6 +725,10 @@
         var q = quizState.questions[quizState.currentIndex];
         if (!q) return;
 
+        // Don't hijack Enter from grid-in input
+        var active = document.activeElement;
+        if (active && active.id === 'grid-in-input') return;
+
         var key = e.key.toLowerCase();
 
         if (q.type === 'mc' && !quizState.answered) {
@@ -742,7 +750,6 @@
             } else if (q.type === 'mc' && quizState.selectedChoice !== null) {
                 window.submitAnswer();
             }
-            // Grid-in Enter is handled by the input's onkeydown
         }
     });
 
@@ -773,7 +780,16 @@
             }
         }
 
-        showExplanation(q, isCorrect);
+        // In timed mode, auto-advance without explanation
+        if (quizState.mode === 'timed') {
+            if (quizState.currentIndex < quizState.questions.length - 1) {
+                setTimeout(function() { window.nextQuestion(); }, 600);
+            } else {
+                setTimeout(function() { finishQuiz(); }, 600);
+            }
+        } else {
+            showExplanation(q, isCorrect);
+        }
     };
 
     window.submitGridIn = function() {
@@ -809,7 +825,16 @@
         input.classList.add(isCorrect ? 'correct' : 'incorrect');
         input.disabled = true;
 
-        showExplanation(q, isCorrect);
+        // In timed mode, auto-advance without explanation
+        if (quizState.mode === 'timed') {
+            if (quizState.currentIndex < quizState.questions.length - 1) {
+                setTimeout(function() { window.nextQuestion(); }, 600);
+            } else {
+                setTimeout(function() { finishQuiz(); }, 600);
+            }
+        } else {
+            showExplanation(q, isCorrect);
+        }
     };
 
     function showExplanation(q, isCorrect) {
@@ -933,9 +958,18 @@
         var circumference = 2 * Math.PI * 85;
         var dashOffset = circumference - (pct / 100) * circumference;
 
-        var html = '<div class="results-container fade-in">' +
+        // Celebrate if estimated score hits 700+
+        var showCelebration = state.currentScore >= 700 && quizState.mode !== 'diagnostic';
+
+        var html = '';
+        if (showCelebration) {
+            html += '<div id="confetti-container" class="confetti-container"></div>';
+        }
+
+        html += '<div class="results-container fade-in">' +
             '<h1 class="page-title text-center">' +
-                (quizState.mode === 'diagnostic' ? 'Diagnostic Results' : 'Practice Results') +
+                (quizState.mode === 'diagnostic' ? 'Diagnostic Results' :
+                 showCelebration ? '&#127881; You Hit 700+! &#127881;' : 'Practice Results') +
             '</h1>' +
             '<div class="results-score-ring">' +
                 '<svg viewBox="0 0 200 200">' +
@@ -1015,6 +1049,32 @@
         '</div></div>';
 
         render(html);
+
+        // Fire confetti if 700+ reached
+        if (showCelebration) {
+            launchConfetti();
+        }
+    }
+
+    function launchConfetti() {
+        var container = document.getElementById('confetti-container');
+        if (!container) return;
+        var colors = ['#3b82f6', '#7c3aed', '#059669', '#d97706', '#dc2626', '#f59e0b', '#10b981'];
+        for (var i = 0; i < 80; i++) {
+            var piece = document.createElement('div');
+            piece.className = 'confetti-piece';
+            piece.style.left = Math.random() * 100 + '%';
+            piece.style.background = colors[Math.floor(Math.random() * colors.length)];
+            piece.style.animationDuration = (Math.random() * 2 + 1.5) + 's';
+            piece.style.animationDelay = (Math.random() * 0.8) + 's';
+            piece.style.width = (Math.random() * 8 + 4) + 'px';
+            piece.style.height = (Math.random() * 12 + 6) + 'px';
+            container.appendChild(piece);
+        }
+        // Clean up after animation
+        setTimeout(function() {
+            if (container.parentNode) container.innerHTML = '';
+        }, 5000);
     }
 
     // ============================================
