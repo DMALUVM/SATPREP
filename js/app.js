@@ -30,7 +30,7 @@
 
     function loadState() {
         try {
-            const saved = localStorage.getItem('sat_prep_state');
+            var saved = localStorage.getItem('sat_prep_state');
             if (saved) {
                 state = Object.assign({}, DEFAULT_STATE, JSON.parse(saved));
             } else {
@@ -41,11 +41,44 @@
         }
     }
 
+    // Load state from cloud (called after auth)
+    async function loadStateFromCloud() {
+        if (!window.SATSync || !window.SATSync.isLoggedIn()) return;
+        try {
+            var cloudState = await window.SATSync.loadFromCloud();
+            if (cloudState) {
+                // Cloud state exists — use it if it has more progress than local
+                var cloudAnswered = Object.keys(cloudState.questionsAnswered || {}).length;
+                var localAnswered = Object.keys(state.questionsAnswered || {}).length;
+                if (cloudAnswered >= localAnswered) {
+                    state = Object.assign({}, DEFAULT_STATE, cloudState);
+                    localStorage.setItem('sat_prep_state', JSON.stringify(state));
+                    console.log('[Sync] Loaded cloud state (' + cloudAnswered + ' answers)');
+                } else {
+                    // Local has more progress, push to cloud
+                    console.log('[Sync] Local state newer, pushing to cloud');
+                    window.SATSync.saveToCloud(state);
+                }
+            } else {
+                // No cloud state yet, push local to cloud
+                if (state.initialized) {
+                    window.SATSync.saveToCloud(state);
+                }
+            }
+        } catch(e) {
+            console.warn('Cloud load failed, using local state:', e);
+        }
+    }
+
     function saveState() {
         try {
             localStorage.setItem('sat_prep_state', JSON.stringify(state));
         } catch(e) {
             console.warn('Could not save state:', e);
+        }
+        // Also sync to cloud (debounced)
+        if (window.SATSync && window.SATSync.isLoggedIn()) {
+            window.SATSync.saveToCloud(state);
         }
     }
 
@@ -461,38 +494,77 @@
     // ============================================
     function renderWelcome() {
         hideNav();
-        render(
-            '<div class="welcome-screen fade-in">' +
-                '<div class="welcome-logo">SAT MATH PREP</div>' +
-                '<div class="welcome-subtitle">Your 30-Day Path to 700+</div>' +
-                '<div class="welcome-card">' +
-                    '<h2>Let\'s Get You There</h2>' +
-                    '<p>This app is designed to take your SAT Math score from where you are now to 700+. ' +
-                    'We\'ll start with a quick diagnostic to find your strengths and weaknesses, then build a personalized study plan.</p>' +
-                    '<div class="welcome-features">' +
-                        '<div class="welcome-feature">' +
-                            '<div class="welcome-feature-icon">&#9733;</div>' +
-                            '<div class="welcome-feature-text">Smart diagnostic finds your weak spots</div>' +
-                        '</div>' +
-                        '<div class="welcome-feature">' +
-                            '<div class="welcome-feature-icon">&#9654;</div>' +
-                            '<div class="welcome-feature-text">Step-by-step lessons that actually teach</div>' +
-                        '</div>' +
-                        '<div class="welcome-feature">' +
-                            '<div class="welcome-feature-icon">&#9632;</div>' +
-                            '<div class="welcome-feature-text">150+ real SAT-style practice questions</div>' +
-                        '</div>' +
-                        '<div class="welcome-feature">' +
-                            '<div class="welcome-feature-icon">&#9650;</div>' +
-                            '<div class="welcome-feature-text">Track your progress and score gains</div>' +
-                        '</div>' +
+        var syncAvailable = window.SATSync && window.SATSync.isConfigured();
+        var alreadyLoggedIn = syncAvailable && window.SATSync.isLoggedIn();
+
+        var html = '<div class="welcome-screen fade-in">' +
+            '<div class="welcome-logo">SAT MATH PREP</div>' +
+            '<div class="welcome-subtitle">Your 30-Day Path to 700+</div>' +
+            '<div class="welcome-card">' +
+                '<h2>Let\'s Get You There</h2>' +
+                '<p>This app is designed to take your SAT Math score from where you are now to 700+. ' +
+                'We\'ll start with a quick diagnostic to find your strengths and weaknesses, then build a personalized study plan.</p>' +
+                '<div class="welcome-features">' +
+                    '<div class="welcome-feature">' +
+                        '<div class="welcome-feature-icon">&#9733;</div>' +
+                        '<div class="welcome-feature-text">Smart diagnostic finds your weak spots</div>' +
                     '</div>' +
-                    '<button class="btn btn-primary btn-lg btn-block" onclick="window.location.hash=\'#/diagnostic-intro\'">Start Diagnostic Test</button>' +
-                    '<p style="margin-top:16px;font-size:13px;color:var(--gray-400);">Takes about 20 minutes. No time limit for the diagnostic.</p>' +
-                '</div>' +
-            '</div>'
-        );
+                    '<div class="welcome-feature">' +
+                        '<div class="welcome-feature-icon">&#9654;</div>' +
+                        '<div class="welcome-feature-text">Step-by-step lessons that actually teach</div>' +
+                    '</div>' +
+                    '<div class="welcome-feature">' +
+                        '<div class="welcome-feature-icon">&#9632;</div>' +
+                        '<div class="welcome-feature-text">150+ real SAT-style practice questions</div>' +
+                    '</div>' +
+                    '<div class="welcome-feature">' +
+                        '<div class="welcome-feature-icon">&#9650;</div>' +
+                        '<div class="welcome-feature-text">Track your progress and score gains</div>' +
+                    '</div>' +
+                '</div>';
+
+        if (syncAvailable && !alreadyLoggedIn) {
+            html += '<div style="margin-bottom:20px">' +
+                '<label style="display:block;font-size:14px;font-weight:600;color:var(--gray-700);margin-bottom:6px">Your Name (so we can save your progress)</label>' +
+                '<input type="text" id="welcome-name" placeholder="Enter your first name" ' +
+                    'style="width:100%;padding:12px 16px;border:2px solid var(--gray-200);border-radius:8px;font-size:16px;font-family:var(--font);outline:none" ' +
+                    'onfocus="this.style.borderColor=\'var(--primary)\'" onblur="this.style.borderColor=\'var(--gray-200)\'">' +
+            '</div>' +
+            '<button class="btn btn-primary btn-lg btn-block" onclick="startWithSync()">Start Diagnostic Test</button>' +
+            '<p style="margin-top:12px;font-size:13px;color:var(--gray-400);">Your progress will be saved to the cloud automatically.</p>';
+        } else {
+            html += '<button class="btn btn-primary btn-lg btn-block" onclick="window.location.hash=\'#/diagnostic-intro\'">Start Diagnostic Test</button>' +
+            '<p style="margin-top:16px;font-size:13px;color:var(--gray-400);">Takes about 20 minutes. No time limit for the diagnostic.</p>';
+        }
+
+        html += '</div></div>';
+        render(html);
     }
+
+    window.startWithSync = async function() {
+        var nameInput = document.getElementById('welcome-name');
+        var name = nameInput ? nameInput.value.trim() : '';
+        if (!name) {
+            if (nameInput) {
+                nameInput.style.borderColor = 'var(--danger)';
+                nameInput.placeholder = 'Please enter your name';
+                nameInput.focus();
+            }
+            return;
+        }
+        // Show loading state
+        var btns = document.querySelectorAll('.welcome-card .btn-primary');
+        if (btns.length > 0) {
+            btns[0].textContent = 'Setting up...';
+            btns[0].disabled = true;
+        }
+        // Sign in anonymously with Supabase
+        if (window.SATSync) {
+            await window.SATSync.signInAnonymous(name);
+            await loadStateFromCloud();
+        }
+        window.location.hash = '#/diagnostic-intro';
+    };
 
     // ============================================
     // DIAGNOSTIC INTRO
@@ -1089,9 +1161,14 @@
             Math.round((Object.values(state.questionsAnswered).filter(function(a) { return a.correct; }).length / answered) * 100) : 0;
         var day = getStudyDay();
 
+        var syncName = (window.SATSync && window.SATSync.getDisplayName()) || '';
+        var greeting = syncName ? 'Welcome Back, ' + syncName : 'Welcome Back';
+        var syncBadge = (window.SATSync && window.SATSync.isLoggedIn()) ?
+            '<span style="display:inline-flex;align-items:center;gap:4px;font-size:12px;color:var(--success);font-weight:600;background:var(--success-bg);padding:2px 8px;border-radius:10px;margin-left:8px">&#9679; Cloud Sync</span>' : '';
+
         var html = '<div class="fade-in">' +
             '<div class="dashboard-header">' +
-                '<h1>Welcome Back</h1>' +
+                '<h1>' + greeting + syncBadge + '</h1>' +
                 '<p>Day ' + day + ' of 30 &mdash; Keep pushing toward 700+!</p>' +
             '</div>' +
             '<div class="dashboard-grid">' +
@@ -1697,11 +1774,21 @@
     function init() {
         loadState();
 
+        // Initialize Supabase sync
+        if (window.SATSync) {
+            window.SATSync.init();
+        }
+
         // Wait for question data to load
         var checkData = setInterval(function() {
             if (window.SAT_QUESTIONS && window.SAT_LESSONS) {
                 clearInterval(checkData);
-                route();
+                // If already logged in, load cloud state before routing
+                if (window.SATSync && window.SATSync.isLoggedIn()) {
+                    loadStateFromCloud().then(function() { route(); });
+                } else {
+                    route();
+                }
             }
         }, 100);
 
@@ -1713,6 +1800,13 @@
             route();
         }, 3000);
     }
+
+    // Save to cloud before leaving the page
+    window.addEventListener('beforeunload', function() {
+        if (window.SATSync && window.SATSync.isLoggedIn()) {
+            window.SATSync.saveNow(state);
+        }
+    });
 
     // Expose hideModal globally for onclick handlers
     window.hideModal = hideModal;
