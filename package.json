@@ -1,0 +1,23 @@
+{
+  "name": "satprep-standalone",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "satprep:validate-bank": "node scripts/satprep/validate-question-bank.mjs",
+    "satprep:validate-verbal": "node scripts/satprep/validate-verbal-bank.mjs",
+    "satprep:seed-bank": "node scripts/satprep/seed-question-bank.mjs"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.90.1",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^5.1.1",
+    "vite": "^7.2.4"
+  }
+}
