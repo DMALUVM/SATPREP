@@ -1,0 +1,14 @@
+{
+  "functions": {
+    "api/satprep/generate-daily-mission.js": { "maxDuration": 30, "memory": 512 },
+    "api/satprep/submit-attempt.js": { "maxDuration": 30, "memory": 512 },
+    "api/satprep/complete-session.js": { "maxDuration": 30, "memory": 512 },
+    "api/satprep/progress.js": { "maxDuration": 30, "memory": 512 },
+    "api/satprep/parent-report.js": { "maxDuration": 30, "memory": 512 },
+    "api/satprep/export-weekly-report.js": { "maxDuration": 30, "memory": 512 }
+  },
+  "rewrites": [
+    { "source": "/sat-prep", "destination": "/index.html" },
+    { "source": "/sat-prep/(.*)", "destination": "/index.html" }
+  ]
+}
