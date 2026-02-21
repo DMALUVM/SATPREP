@@ -1237,3 +1237,41 @@
   font-size: 14px;
   line-height: 1.5;
 }
+
+/* AI Tutor */
+.sat-ai-tutor {
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--sat-line);
+}
+
+.sat-ai-tutor__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.sat-ai-tutor__header strong {
+  color: var(--sat-primary);
+  font-size: 15px;
+}
+
+.sat-ai-tutor__body {
+  background: rgba(10, 127, 116, 0.05);
+  border-left: 3px solid var(--sat-primary);
+  padding: 12px 14px;
+  border-radius: 0 8px 8px 0;
+  font-size: 14px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+}
+
+.sat-ai-tutor__disclaimer {
+  margin-top: 8px;
+  font-size: 12px;
+  color: var(--sat-subtle);
+  font-style: italic;
+}

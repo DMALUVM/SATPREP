@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { completeSession, submitAttempt } from '../lib/apiClient';
+import { completeSession, fetchAiExplanation, submitAttempt } from '../lib/apiClient';
 import { buildCoachingPlan } from '../lib/coaching';
 import { getDesmosGuide } from '../lib/desmosGuide';
 import { estimateSessionWindow } from '../lib/sessionTime';
@@ -100,6 +100,9 @@ export default function SessionRunner({
   const [flagged, setFlagged] = useState(() => resumeOffer?.flagged || {});
   const [eliminated, setEliminated] = useState(() => resumeOffer?.eliminated || {});
   const [showNav, setShowNav] = useState(false);
+  const [aiExplanations, setAiExplanations] = useState({});
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiError, setAiError] = useState('');
 
   // Clear resume offer after initial load
   useEffect(() => { if (resumeOffer) setResumeOffer(null); }, []); // eslint-disable-line react-hooks/exhaustive-deps
@@ -290,6 +293,38 @@ export default function SessionRunner({
       ...prev,
       [currentQuestion.id]: true,
     }));
+  }
+
+  async function requestAiExplanation() {
+    if (!currentQuestion || !review || aiLoading) return;
+    // Return cached explanation if we already have one for this question
+    if (aiExplanations[currentQuestion.id]) return;
+
+    setAiLoading(true);
+    setAiError('');
+    try {
+      const isVerbal = mode === 'verbal' || mode === 'verbal-reading' || mode === 'verbal-writing';
+      const result = await fetchAiExplanation({
+        stem: String(currentQuestion.stem || '').slice(0, 1000),
+        choices: currentQuestion.choices || [],
+        student_answer: review.answer,
+        correct_answer: currentQuestion.answer_key,
+        skill: currentQuestion.skill,
+        domain: currentQuestion.domain,
+        section: isVerbal ? 'verbal' : 'math',
+      });
+      setAiExplanations((prev) => ({
+        ...prev,
+        [currentQuestion.id]: {
+          text: result.explanation,
+          remaining: result.daily_remaining,
+        },
+      }));
+    } catch (err) {
+      setAiError(err.message || 'AI tutor unavailable right now.');
+    } finally {
+      setAiLoading(false);
+    }
   }
 
   async function submitCurrentAnswer() {
@@ -776,6 +811,38 @@ export default function SessionRunner({
                 Full walkthrough is locked until you complete the coach prompts or choose reveal.
               </p>
             )}
+
+            <div className="sat-ai-tutor">
+              {aiExplanations[currentQuestion.id] ? (
+                <>
+                  <div className="sat-ai-tutor__header">
+                    <strong>AI Tutor Explanation</strong>
+                    <span className="sat-pill sat-pill--neutral">{aiExplanations[currentQuestion.id].remaining} AI uses left today</span>
+                  </div>
+                  <div className="sat-ai-tutor__body">
+                    {aiExplanations[currentQuestion.id].text}
+                  </div>
+                  <p className="sat-ai-tutor__disclaimer">
+                    AI explanations are grounded in the question data. Always verify against the step-by-step walkthrough above.
+                  </p>
+                </>
+              ) : (
+                <>
+                  <button
+                    type="button"
+                    className={`sat-btn ${review.isCorrect ? 'sat-btn--ghost' : 'sat-btn--primary'}`}
+                    onClick={requestAiExplanation}
+                    disabled={aiLoading}
+                    style={{ marginTop: 8 }}
+                  >
+                    {aiLoading ? (
+                      <><span className="sat-loader sat-loader--sm" style={{ display: 'inline-block', verticalAlign: 'middle', marginRight: 8 }} aria-hidden="true" />Thinking...</>
+                    ) : review.isCorrect ? 'AI Deep Dive' : 'Ask AI Tutor: Why is my answer wrong?'}
+                  </button>
+                  {aiError ? <div className="sat-alert sat-alert--danger" style={{ marginTop: 6 }}>{aiError}</div> : null}
+                </>
+              )}
+            </div>
           </div>
         ) : null}
       </article>

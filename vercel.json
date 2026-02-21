@@ -5,7 +5,8 @@
     "api/satprep/complete-session.js": { "maxDuration": 30, "memory": 512 },
     "api/satprep/progress.js": { "maxDuration": 30, "memory": 512 },
     "api/satprep/parent-report.js": { "maxDuration": 30, "memory": 512 },
-    "api/satprep/export-weekly-report.js": { "maxDuration": 30, "memory": 512 }
+    "api/satprep/export-weekly-report.js": { "maxDuration": 30, "memory": 512 },
+    "api/satprep/ai-explain.js": { "maxDuration": 30, "memory": 256 }
   },
   "rewrites": [
     { "source": "/sat-prep", "destination": "/index.html" },

@@ -381,6 +381,17 @@ export async function fetchParentReport(params = {}) {
   }
 }
 
+export async function fetchAiExplanation(payload) {
+  if (typeof navigator !== 'undefined' && !navigator.onLine) {
+    throw new Error('AI tutor requires internet connection.');
+  }
+
+  return satFetch('/api/satprep/ai-explain', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
+
 export async function exportWeeklyReport(payload = {}) {
   if (typeof navigator !== 'undefined' && !navigator.onLine) {
     throw new Error('Weekly report export requires internet connection.');

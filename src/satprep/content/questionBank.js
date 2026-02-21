@@ -15,7 +15,7 @@ const TARGET_SECONDS = {
   5: 125,
 };
 
-const QUESTION_BANK_VERSION = '2026.02.20.v1';
+const QUESTION_BANK_VERSION = '2026.02.21.v2';
 
 function mulberry32(seed) {
   let t = seed >>> 0;
@@ -675,6 +675,286 @@ function templateArea(seed, variant = 0) {
   });
 }
 
+function templateTrigonometry(seed, variant = 0) {
+  const rand = mulberry32(seed + variant * 2801);
+  // SOH-CAH-TOA with common SAT angle combos
+  const setups = [
+    { opp: 3, adj: 4, hyp: 5 },
+    { opp: 5, adj: 12, hyp: 13 },
+    { opp: 8, adj: 15, hyp: 17 },
+    { opp: 7, adj: 24, hyp: 25 },
+  ];
+  const setup = pick(rand, setups);
+  const scale = randInt(rand, 1, 3);
+  const opp = setup.opp * scale;
+  const adj = setup.adj * scale;
+  const hyp = setup.hyp * scale;
+  const ratioType = pick(rand, ['sin', 'cos', 'tan']);
+  let answer, answerStr;
+  if (ratioType === 'sin') { answer = opp / hyp; answerStr = `${opp}/${hyp}`; }
+  else if (ratioType === 'cos') { answer = adj / hyp; answerStr = `${adj}/${hyp}`; }
+  else { answer = opp / adj; answerStr = `${opp}/${adj}`; }
+  const rounded = Number(answer.toFixed(2));
+  // Use integer spread on the hundredths digit for clean MC choices
+  const trigSpread = Math.max(5, Math.round(rounded * 100 * 0.3));
+  const { choices, answerKey } = makeMcChoices(rand, rounded * 100, trigSpread, 0);
+  const trigChoices = choices.map((c) => formatNumber(Number(c) / 100));
+  const trigAnswerKey = trigChoices.indexOf(formatNumber(rounded));
+  return buildTemplateQuestion({
+    id: `gen-trig-${seed}`,
+    domain: 'geometry-trig',
+    skill: 'trigonometry',
+    difficulty: pick(rand, [2, 3, 3, 4]),
+    format: 'multiple_choice',
+    stem: `In a right triangle, the side opposite angle A is ${opp} and the ${ratioType === 'tan' ? 'adjacent side' : 'hypotenuse'} is ${ratioType === 'sin' ? hyp : ratioType === 'cos' ? hyp : adj}. What is ${ratioType}(A)?`,
+    choices: trigChoices,
+    answer_key: trigAnswerKey >= 0 ? trigAnswerKey : 0,
+    explanation_steps: [
+      `${ratioType === 'sin' ? 'sin = opposite/hypotenuse' : ratioType === 'cos' ? 'cos = adjacent/hypotenuse' : 'tan = opposite/adjacent'} (SOH-CAH-TOA).`,
+      `Compute ${answerStr} = ${rounded}.`,
+      `${ratioType}(A) = ${rounded}.`,
+    ],
+    strategy_tip: 'Write SOH-CAH-TOA at the top of your scratch work. Identify opposite, adjacent, hypotenuse before computing.',
+    trap_tag: 'Mixing up which sides are opposite vs adjacent to the given angle.',
+    templateKey: 'trigonometry',
+    template_seed: seed,
+  });
+}
+
+function templateRatio(seed, variant = 0) {
+  const rand = mulberry32(seed + variant * 2879);
+  const ratioA = randInt(rand, 2, 7);
+  const ratioB = randInt(rand, 3, 9);
+  const total = pick(rand, [60, 72, 80, 90, 100, 120, 150, 180, 200]);
+  const partA = (total * ratioA) / (ratioA + ratioB);
+  if (!Number.isInteger(partA)) {
+    // Fallback to guaranteed integer result
+    const safeTotal = (ratioA + ratioB) * randInt(rand, 5, 15);
+    const safePartA = (safeTotal * ratioA) / (ratioA + ratioB);
+    const { choices, answerKey } = makeMcChoices(rand, safePartA, 20, 0);
+    return buildTemplateQuestion({
+      id: `gen-ratio-${seed}`,
+      domain: 'problem-solving-data',
+      skill: 'ratios',
+      difficulty: pick(rand, [1, 2, 2, 3]),
+      format: 'multiple_choice',
+      stem: `Two quantities are in the ratio ${ratioA}:${ratioB}. If their total is ${safeTotal}, what is the smaller quantity?`,
+      choices,
+      answer_key: answerKey,
+      explanation_steps: [
+        `Total parts = ${ratioA} + ${ratioB} = ${ratioA + ratioB}.`,
+        `Each part = ${safeTotal} / ${ratioA + ratioB} = ${safeTotal / (ratioA + ratioB)}.`,
+        `Smaller quantity = ${ratioA} * ${safeTotal / (ratioA + ratioB)} = ${safePartA}.`,
+      ],
+      strategy_tip: 'Find value of one "part" first, then multiply by the ratio number.',
+      trap_tag: 'Dividing total by only one ratio number instead of the sum.',
+      templateKey: 'ratios',
+      template_seed: seed,
+    });
+  }
+  const { choices, answerKey } = makeMcChoices(rand, partA, 20, 0);
+  return buildTemplateQuestion({
+    id: `gen-ratio-${seed}`,
+    domain: 'problem-solving-data',
+    skill: 'ratios',
+    difficulty: pick(rand, [1, 2, 2, 3]),
+    format: 'multiple_choice',
+    stem: `Two quantities are in the ratio ${ratioA}:${ratioB}. If their total is ${total}, what is the smaller quantity?`,
+    choices,
+    answer_key: answerKey,
+    explanation_steps: [
+      `Total parts = ${ratioA} + ${ratioB} = ${ratioA + ratioB}.`,
+      `Each part = ${total} / ${ratioA + ratioB} = ${total / (ratioA + ratioB)}.`,
+      `Smaller quantity = ${ratioA} * ${total / (ratioA + ratioB)} = ${partA}.`,
+    ],
+    strategy_tip: 'Find value of one "part" first, then multiply by the ratio number.',
+    trap_tag: 'Dividing total by only one ratio number instead of the sum.',
+    templateKey: 'ratios',
+    template_seed: seed,
+  });
+}
+
+function templateProbability(seed, variant = 0) {
+  const rand = mulberry32(seed + variant * 2953);
+  const total = pick(rand, [20, 25, 30, 40, 50, 60, 80, 100]);
+  const favorable = randInt(rand, Math.round(total * 0.1), Math.round(total * 0.6));
+  const answer = Number((favorable / total).toFixed(2));
+  const context = pick(rand, [
+    { item: 'marbles', container: 'bag', color: pick(rand, ['red', 'blue', 'green']) },
+    { item: 'cards', container: 'deck', color: pick(rand, ['hearts', 'numbered', 'face']) },
+    { item: 'students', container: 'class', color: pick(rand, ['who passed', 'who chose option A', 'with perfect attendance']) },
+  ]);
+  // Generate choices in integer hundredths space for reliable 4 unique values
+  const probInt = Math.round(answer * 100);
+  const { choices: rawProbChoices, answerKey: rawProbKey } = makeMcChoices(rand, probInt, Math.max(5, Math.round(probInt * 0.3)), 0);
+  const probChoices = rawProbChoices.map((c) => formatNumber(Number(c) / 100));
+  const probAnswerKey = probChoices.indexOf(formatNumber(answer));
+  return buildTemplateQuestion({
+    id: `gen-prob-${seed}`,
+    domain: 'problem-solving-data',
+    skill: 'probability',
+    difficulty: pick(rand, [1, 2, 2, 3]),
+    format: 'multiple_choice',
+    stem: `A ${context.container} contains ${total} ${context.item}. ${favorable} are ${context.color}. If one ${context.item.slice(0, -1)} is selected at random, what is the probability it is ${context.color}?`,
+    choices: probChoices,
+    answer_key: probAnswerKey >= 0 ? probAnswerKey : 0,
+    explanation_steps: [
+      `Probability = favorable / total.`,
+      `P = ${favorable} / ${total} = ${answer}.`,
+      `The probability is ${answer}.`,
+    ],
+    strategy_tip: 'Probability = (what you want) / (total possible). Always check both numbers.',
+    trap_tag: 'Using complement count instead of favorable count.',
+    templateKey: 'probability',
+    template_seed: seed,
+  });
+}
+
+function templateDataInterpretation(seed, variant = 0) {
+  const rand = mulberry32(seed + variant * 3037);
+  const categories = pick(rand, [
+    ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'],
+    ['Store A', 'Store B', 'Store C', 'Store D'],
+    ['Q1', 'Q2', 'Q3', 'Q4'],
+  ]);
+  const values = categories.map(() => randInt(rand, 10, 95));
+  const maxIdx = values.indexOf(Math.max(...values));
+  const minIdx = values.indexOf(Math.min(...values));
+  const diff = values[maxIdx] - values[minIdx];
+  const { choices, answerKey } = makeMcChoices(rand, diff, 15, 0);
+  const tableRows = categories.map((cat, i) => `${cat}: ${values[i]}`).join(', ');
+  return buildTemplateQuestion({
+    id: `gen-data-${seed}`,
+    domain: 'problem-solving-data',
+    skill: 'data-interpretation',
+    difficulty: pick(rand, [1, 2, 2, 3]),
+    format: 'multiple_choice',
+    stem: `The following data shows sales by category: ${tableRows}. What is the difference between the highest and lowest values?`,
+    choices,
+    answer_key: answerKey,
+    explanation_steps: [
+      `Identify max value: ${categories[maxIdx]} = ${values[maxIdx]}.`,
+      `Identify min value: ${categories[minIdx]} = ${values[minIdx]}.`,
+      `Difference = ${values[maxIdx]} - ${values[minIdx]} = ${diff}.`,
+    ],
+    strategy_tip: 'Scan all values first. Circle max and min before computing.',
+    trap_tag: 'Subtracting wrong pair or misreading a value from the table.',
+    templateKey: 'data-interpretation',
+    template_seed: seed,
+  });
+}
+
+function templateExponentialFunction(seed, variant = 0) {
+  const rand = mulberry32(seed + variant * 3109);
+  const initial = pick(rand, [100, 200, 500, 1000, 2000, 5000]);
+  const rate = pick(rand, [0.03, 0.05, 0.08, 0.10, 0.12, 0.15, 0.20]);
+  const isGrowth = rand() < 0.6;
+  const years = randInt(rand, 2, 5);
+  const multiplier = isGrowth ? (1 + rate) : (1 - rate);
+  const answer = Number((initial * Math.pow(multiplier, years)).toFixed(0));
+  const { choices, answerKey } = makeMcChoices(rand, answer, Math.round(answer * 0.15), 0);
+  const pctStr = Math.round(rate * 100);
+  return buildTemplateQuestion({
+    id: `gen-expfn-${seed}`,
+    domain: 'advanced-math',
+    skill: 'exponential-functions',
+    difficulty: pick(rand, [2, 3, 3, 4]),
+    format: 'multiple_choice',
+    stem: `A quantity starts at ${initial} and ${isGrowth ? 'increases' : 'decreases'} by ${pctStr}% per year. What is its value after ${years} years, rounded to the nearest whole number?`,
+    choices,
+    answer_key: answerKey,
+    explanation_steps: [
+      `Use formula: value = ${initial} * ${isGrowth ? `(1 + ${rate})` : `(1 - ${rate})`}^${years}.`,
+      `Compute ${initial} * ${formatNumber(multiplier)}^${years}.`,
+      `After ${years} years: ${answer}.`,
+    ],
+    strategy_tip: 'Use multiplier form: (1 + rate) for growth, (1 - rate) for decay. On Desmos, type the full expression.',
+    trap_tag: 'Multiplying by rate instead of (1 + rate), or applying simple interest instead of compound.',
+    templateKey: 'exponential-functions',
+    template_seed: seed,
+  });
+}
+
+function templateVolume(seed, variant = 0) {
+  const rand = mulberry32(seed + variant * 3187);
+  const shape = pick(rand, ['cylinder', 'rectangular-prism', 'cone']);
+  if (shape === 'cylinder') {
+    const r = randInt(rand, 2, 8);
+    const h = randInt(rand, 3, 15);
+    const answer = Number((Math.PI * r * r * h).toFixed(1));
+    const { choices, answerKey } = makeMcChoices(rand, answer, Math.round(answer * 0.2), 1);
+    return buildTemplateQuestion({
+      id: `gen-vol-${seed}`,
+      domain: 'geometry-trig',
+      skill: 'volume',
+      difficulty: pick(rand, [2, 3, 3, 4]),
+      format: 'multiple_choice',
+      stem: `A cylinder has radius ${r} and height ${h}. What is its volume? (Round to nearest tenth.)`,
+      choices,
+      answer_key: answerKey,
+      explanation_steps: [
+        `Volume of cylinder = \u03C0r\u00B2h.`,
+        `V = \u03C0(${r})\u00B2(${h}) = \u03C0(${r * r})(${h}).`,
+        `V \u2248 ${answer}.`,
+      ],
+      strategy_tip: 'Always square the radius first, then multiply by height and \u03C0.',
+      trap_tag: 'Forgetting to square the radius or using diameter instead of radius.',
+      templateKey: 'volume',
+      template_seed: seed,
+    });
+  }
+  if (shape === 'cone') {
+    const r = randInt(rand, 2, 7);
+    const h = randInt(rand, 4, 12);
+    const answer = Number(((Math.PI * r * r * h) / 3).toFixed(1));
+    const { choices, answerKey } = makeMcChoices(rand, answer, Math.round(answer * 0.25), 1);
+    return buildTemplateQuestion({
+      id: `gen-vol-${seed}`,
+      domain: 'geometry-trig',
+      skill: 'volume',
+      difficulty: pick(rand, [3, 3, 4, 4]),
+      format: 'multiple_choice',
+      stem: `A cone has radius ${r} and height ${h}. What is its volume? (Round to nearest tenth.)`,
+      choices,
+      answer_key: answerKey,
+      explanation_steps: [
+        `Volume of cone = (1/3)\u03C0r\u00B2h.`,
+        `V = (1/3)\u03C0(${r})\u00B2(${h}).`,
+        `V \u2248 ${answer}.`,
+      ],
+      strategy_tip: 'Cone is 1/3 of a cylinder with same base and height. The formula is on the SAT reference sheet.',
+      trap_tag: 'Forgetting the 1/3 factor or confusing cone and cylinder formulas.',
+      templateKey: 'volume',
+      template_seed: seed,
+    });
+  }
+  // rectangular prism
+  const l = randInt(rand, 3, 12);
+  const w = randInt(rand, 2, 10);
+  const h = randInt(rand, 2, 8);
+  const answer = l * w * h;
+  const { choices, answerKey } = makeMcChoices(rand, answer, 40, 0);
+  return buildTemplateQuestion({
+    id: `gen-vol-${seed}`,
+    domain: 'geometry-trig',
+    skill: 'volume',
+    difficulty: pick(rand, [1, 2, 2, 3]),
+    format: 'multiple_choice',
+    stem: `A rectangular box has length ${l}, width ${w}, and height ${h}. What is its volume?`,
+    choices,
+    answer_key: answerKey,
+    explanation_steps: [
+      `Volume = length \u00D7 width \u00D7 height.`,
+      `V = ${l} \u00D7 ${w} \u00D7 ${h} = ${answer}.`,
+      `The volume is ${answer}.`,
+    ],
+    strategy_tip: 'Multiply all three dimensions. Double-check you used the right numbers.',
+    trap_tag: 'Computing surface area instead of volume, or only multiplying two dimensions.',
+    templateKey: 'volume',
+    template_seed: seed,
+  });
+}
+
 const TEMPLATE_REGISTRY = {
   'linear-equations': templateLinear,
   'linear-functions': templateSlope,
@@ -689,22 +969,40 @@ const TEMPLATE_REGISTRY = {
   'right-triangles': templatePythagorean,
   circles: templateCircle,
   'area-perimeter': templateArea,
+  trigonometry: templateTrigonometry,
+  ratios: templateRatio,
+  probability: templateProbability,
+  'data-interpretation': templateDataInterpretation,
+  'exponential-functions': templateExponentialFunction,
+  volume: templateVolume,
 };
 
+// Counts calibrated to match March 2026 Digital SAT blueprint:
+// Algebra ~35%, Advanced Math ~35%, Problem Solving & Data ~15%, Geometry & Trig ~15%
 const TEMPLATE_PLAN = [
+  // Algebra (~35% of math)
   { key: 'linear-equations', count: 22 },
   { key: 'linear-functions', count: 20 },
   { key: 'systems', count: 18 },
   { key: 'inequalities', count: 14 },
+  // Advanced Math (~35% of math)
   { key: 'quadratics', count: 24 },
-  { key: 'exponents', count: 22 },
+  { key: 'exponents', count: 20 },
   { key: 'functions', count: 20 },
-  { key: 'polynomials', count: 20 },
-  { key: 'percentages', count: 10 },
-  { key: 'statistics', count: 9 },
+  { key: 'polynomials', count: 18 },
+  { key: 'exponential-functions', count: 10 },
+  // Problem Solving & Data Analysis (~15% of math)
+  { key: 'percentages', count: 12 },
+  { key: 'statistics', count: 10 },
+  { key: 'ratios', count: 10 },
+  { key: 'probability', count: 8 },
+  { key: 'data-interpretation', count: 8 },
+  // Geometry & Trigonometry (~15% of math)
   { key: 'right-triangles', count: 14 },
   { key: 'circles', count: 12 },
   { key: 'area-perimeter', count: 10 },
+  { key: 'trigonometry', count: 12 },
+  { key: 'volume', count: 8 },
 ];
 
 function generateTemplateCanonicals() {
