@@ -277,7 +277,13 @@ function templateInequality(seed, variant = 0) {
   const direction = pick(rand, ['>', '>=']);
   const valid = xBoundary + randInt(rand, 1, 4);
   const invalid = xBoundary - randInt(rand, 1, 4);
-  const choicesRaw = [valid, invalid, xBoundary, xBoundary + randInt(rand, -6, 6)];
+  const choiceSet = new Set([valid, invalid, xBoundary]);
+  while (choiceSet.size < 4) {
+    const candidate = xBoundary + randInt(rand, -7, 7);
+    if (candidate === valid || candidate === invalid || candidate === xBoundary) continue;
+    choiceSet.add(candidate);
+  }
+  const choicesRaw = [...choiceSet];
   const choices = shuffle(rand, choicesRaw).map((v) => String(v));
   const answerKey = choices.indexOf(String(valid));
   return buildTemplateQuestion({
@@ -614,7 +620,7 @@ function templateArea(seed, variant = 0) {
   const rand = mulberry32(seed + variant * 2741);
   const isTriangle = rand() < 0.5;
   if (isTriangle) {
-    const b = randInt(rand, 6, 24);
+    const b = randInt(rand, 3, 12) * 2;
     const h = randInt(rand, 4, 20);
     const answer = (b * h) / 2;
     const { choices, answerKey } = makeMcChoices(rand, answer, 20, 0);
@@ -783,6 +789,123 @@ export function validateQuestionBank(questionBank = buildFullQuestionBank()) {
       }
     }
   }
+  return issues;
+}
+
+function normalizeAuditText(value) {
+  return String(value || '').replace(/\s+/g, ' ').trim().toLowerCase();
+}
+
+function normalizeAuditChoice(value) {
+  return normalizeAuditText(value).replace(/[^a-z0-9.+\-\/<>=,()]/g, '');
+}
+
+function explanationMentionsValue(steps, value) {
+  const joined = normalizeAuditText((steps || []).join(' '));
+  const raw = String(value ?? '').trim();
+  if (!joined || !raw) return false;
+
+  const normalizedRaw = normalizeAuditText(raw);
+  if (joined.includes(normalizedRaw)) return true;
+
+  const numeric = Number(raw);
+  if (Number.isFinite(numeric)) {
+    const numericToken = formatNumber(numeric);
+    if (joined.includes(normalizeAuditText(numericToken))) return true;
+  }
+
+  return false;
+}
+
+function compareTemplateQuestionToExpected(question, expected, issues) {
+  if (!expected) {
+    issues.push(`${question.id}: could not rebuild expected template question`);
+    return;
+  }
+
+  const fields = ['domain', 'skill', 'difficulty', 'format', 'stem'];
+  fields.forEach((field) => {
+    if (String(question[field]) !== String(expected[field])) {
+      issues.push(`${question.id}: template mismatch on ${field}`);
+    }
+  });
+
+  if (String(question.answer_key) !== String(expected.answer_key)) {
+    issues.push(`${question.id}: template mismatch on answer_key`);
+  }
+
+  if (question.format === 'multiple_choice') {
+    const actualChoices = Array.isArray(question.choices) ? question.choices : [];
+    const expectedChoices = Array.isArray(expected.choices) ? expected.choices : [];
+    if (actualChoices.length !== expectedChoices.length) {
+      issues.push(`${question.id}: template mismatch on choices length`);
+    } else {
+      const actualSet = new Set(actualChoices.map((c) => normalizeAuditChoice(c)));
+      const expectedSet = new Set(expectedChoices.map((c) => normalizeAuditChoice(c)));
+      if (actualSet.size !== expectedSet.size || [...actualSet].some((item) => !expectedSet.has(item))) {
+        issues.push(`${question.id}: template mismatch on choices content`);
+      }
+      const actualCorrect = actualChoices[Number(question.answer_key)];
+      const expectedCorrect = expectedChoices[Number(expected.answer_key)];
+      if (normalizeAuditChoice(actualCorrect) !== normalizeAuditChoice(expectedCorrect)) {
+        issues.push(`${question.id}: template mismatch on correct choice`);
+      }
+    }
+  }
+}
+
+export function strictAuditQuestionBank(questionBank = buildFullQuestionBank()) {
+  const issues = [...validateQuestionBank(questionBank)];
+
+  for (let i = 0; i < questionBank.length; i += 1) {
+    const q = questionBank[i];
+
+    if (!q.strategy_tip || String(q.strategy_tip).trim().length < 10) {
+      issues.push(`${q.id}: strategy_tip too short`);
+    }
+    if (!q.trap_tag || String(q.trap_tag).trim().length < 10) {
+      issues.push(`${q.id}: trap_tag too short`);
+    }
+
+    if (q.format === 'multiple_choice') {
+      const choices = Array.isArray(q.choices) ? q.choices : [];
+      const normalizedChoices = choices.map((choice) => normalizeAuditChoice(choice));
+      const uniqueChoices = new Set(normalizedChoices);
+      if (uniqueChoices.size !== normalizedChoices.length) {
+        issues.push(`${q.id}: duplicate answer choices detected`);
+      }
+
+      const answerIndex = Number(q.answer_key);
+      const correctChoice = choices[answerIndex];
+      if (typeof correctChoice === 'undefined') {
+        issues.push(`${q.id}: answer_key does not map to a choice`);
+      } else if (String(q.id).startsWith('gen-') && !explanationMentionsValue(q.explanation_steps, correctChoice)) {
+        issues.push(`${q.id}: generated MC explanation does not clearly reference correct choice`);
+      }
+    }
+
+    if (q.format === 'grid_in' && String(q.id).startsWith('gen-')) {
+      if (!explanationMentionsValue(q.explanation_steps, q.answer_key)) {
+        issues.push(`${q.id}: generated grid explanation does not clearly reference answer`);
+      }
+    }
+
+    if (q.template_key) {
+      if (!Number.isFinite(Number(q.template_seed))) {
+        issues.push(`${q.id}: template_seed missing or invalid`);
+        continue;
+      }
+      const factory = TEMPLATE_REGISTRY[q.template_key];
+      if (!factory) {
+        issues.push(`${q.id}: unknown template_key ${q.template_key}`);
+        continue;
+      }
+      const variantIndex = Number(q.variant_index || 0);
+      const expected = factory(Number(q.template_seed), variantIndex);
+      compareTemplateQuestionToExpected(q, expected, issues);
+    }
+  }
+
   return issues;
 }
 
