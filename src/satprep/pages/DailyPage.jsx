@@ -1,8 +1,8 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import MistakeJournal from '../components/MistakeJournal';
 import SessionRunner from '../components/SessionRunner';
 import SessionSummary from '../components/SessionSummary';
-import { generateDailyMission } from '../lib/apiClient';
+import { fetchAiExplanation, generateDailyMission } from '../lib/apiClient';
 import { getQuestionById } from '../lib/selection';
 import { friendlyDate, getPlanDay, getWeekForDay, toDateKey } from '../lib/time';
 
@@ -118,6 +118,22 @@ export default function DailyPage({ onRefreshProgress, progressMetrics, navigate
   const [error, setError] = useState('');
   const [summary, setSummary] = useState(null);
   const [running, setRunning] = useState(false);
+  const [aiEnabled, setAiEnabled] = useState(null); // null = checking, true/false = result
+
+  // Check if AI tutor is available (API key configured on server)
+  useEffect(() => {
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+      setAiEnabled(false);
+      return;
+    }
+    // Lightweight probe — send a minimal request; a 503 means no key, 400 means key is set
+    fetchAiExplanation({ stem: '__ping__', student_answer: '0', correct_answer: '1' })
+      .then(() => setAiEnabled(true))
+      .catch((err) => {
+        // 503 = API key not configured, anything else (400, 429) means the key IS set
+        setAiEnabled(err?.status !== 503);
+      });
+  }, []);
 
   const today = toDateKey();
   const planDay = getPlanDay(today);
@@ -192,10 +208,21 @@ export default function DailyPage({ onRefreshProgress, progressMetrics, navigate
 
   return (
     <section className="sat-panel">
-      <h2>Daily Mission Console</h2>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+        <h2 style={{ margin: 0 }}>Daily Mission Console</h2>
+        {aiEnabled === true && (
+          <span className="sat-ai-badge">AI Tutor Active</span>
+        )}
+      </div>
       <p>
         {friendlyDate(today)} {'\u2022'} Day {planDay} of 28 {'\u2022'} Week {planWeek}
       </p>
+
+      {aiEnabled === true && (
+        <div className="sat-ai-banner">
+          <strong>AI Tutor is live.</strong> After answering a question wrong, you'll see an "Ask AI Tutor" button that gives you a personalized explanation — including Desmos tips for math. You get 20 AI explanations per day.
+        </div>
+      )}
 
       <NextStepBanner
         hasDiagnostic={hasDiagnostic}

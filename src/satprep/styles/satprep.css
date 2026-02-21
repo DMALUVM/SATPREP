@@ -1238,6 +1238,52 @@
   line-height: 1.5;
 }
 
+/* AI Status Badge & Banner */
+.sat-ai-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px;
+  background: linear-gradient(135deg, rgba(10, 127, 116, 0.12), rgba(10, 127, 116, 0.06));
+  border: 1px solid rgba(10, 127, 116, 0.3);
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--sat-primary-dark);
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+
+.sat-ai-badge::before {
+  content: '';
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--sat-success);
+  box-shadow: 0 0 4px rgba(6, 118, 71, 0.5);
+  animation: sat-pulse 2s ease-in-out infinite;
+}
+
+@keyframes sat-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+.sat-ai-banner {
+  margin-top: 8px;
+  padding: 10px 14px;
+  background: rgba(10, 127, 116, 0.06);
+  border-left: 3px solid var(--sat-primary);
+  border-radius: 0 8px 8px 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--sat-ink);
+}
+
+.sat-ai-banner strong {
+  color: var(--sat-primary-dark);
+}
+
 /* AI Tutor */
 .sat-ai-tutor {
   margin-top: 14px;
