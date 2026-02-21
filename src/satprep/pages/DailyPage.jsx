@@ -3,8 +3,9 @@ import AiStatusBadge from '../components/AiStatusBadge';
 import MistakeJournal from '../components/MistakeJournal';
 import SessionRunner from '../components/SessionRunner';
 import SessionSummary from '../components/SessionSummary';
+import { buildAdaptiveVerbalSet, buildVerbalSet } from '../content/verbalQuestionBank';
 import { generateDailyMission } from '../lib/apiClient';
-import { getQuestionById } from '../lib/selection';
+import { buildAdaptivePracticeSet, buildPracticeSet, getQuestionById } from '../lib/selection';
 import { getDueReviewIds, getReviewStats } from '../lib/spacedRepetition';
 import { getSupabaseBrowserClient } from '../lib/supabaseBrowser';
 import { friendlyDate, getPhaseForDay, getPlanDay, SAT_PLAN_TOTAL_DAYS, SAT_TEST_DATE, setPlanDates, toDateKey } from '../lib/time';
@@ -68,8 +69,7 @@ function buildSkillActionRow(row) {
   };
 }
 
-function NextStepBanner({ hasDiagnostic, mission, missionQuestionCount, summary, navigate }) {
-  let stepNumber = 1;
+function NextStepBanner({ hasDiagnostic, mission, missionQuestionCount, phase, navigate }) {
   let heading = '';
   let detail = '';
   let action = null;
@@ -83,19 +83,17 @@ function NextStepBanner({ hasDiagnostic, mission, missionQuestionCount, summary,
       </button>
     );
   } else if (!mission) {
-    heading = 'Step 1: Generate Today\'s Mission';
-    detail = 'Press the button below to build your personalized daily plan. The app will target your weakest skills first.';
-    action = null; // The generate button is below
-  } else if (missionQuestionCount > 0 && !summary) {
+    heading = 'Step 1: Pick Your Time and Generate';
+    detail = 'Choose how much time you have today, then press Generate. The app handles everything — math first, then verbal, all in one flow.';
+  } else if (missionQuestionCount > 0 && phase === 'idle') {
     heading = 'Step 2: Start Your Mission';
-    detail = `Your mission is ready with ${missionQuestionCount} questions. Press Start Mission below, then work through each question. Use Enter key to submit answers quickly.`;
-    action = null; // The start button is below
-  } else if (summary) {
-    heading = 'Step 3: Do Your Verbal Session';
-    detail = 'Math mission complete. Now switch to Verbal 700+ for a 15-20 minute reading and writing drill. Do this at least 5 days per week.';
+    detail = `Your mission is ready with ${missionQuestionCount} math questions, then verbal. Press Start below and work straight through — the app handles the transitions.`;
+  } else if (phase === 'complete') {
+    heading = 'Mission Complete';
+    detail = 'Great session. Check your progress or do extra practice below if you have more time.';
     action = (
-      <button type="button" className="sat-btn sat-btn--primary" onClick={() => navigate('/verbal')}>
-        Go to Verbal 700+
+      <button type="button" className="sat-btn sat-btn--primary" onClick={() => navigate('/progress')}>
+        Check Progress
       </button>
     );
   }
@@ -267,9 +265,9 @@ function clearMissionState() {
 }
 
 const INTENSITY_OPTIONS = [
-  { key: 'light', label: 'Light', minutes: 30, description: '~11 questions' },
-  { key: 'standard', label: 'Standard', minutes: 55, description: '~20 questions' },
-  { key: 'extended', label: 'Extended', minutes: 90, description: '~34 questions' },
+  { key: 'light', label: 'Light', minutes: 30, verbalCount: 8, description: '~40 min total' },
+  { key: 'standard', label: 'Standard', minutes: 55, verbalCount: 14, description: '~75 min total' },
+  { key: 'extended', label: 'Extended', minutes: 90, verbalCount: 20, description: '~2 hrs total' },
 ];
 
 export default function DailyPage({ onRefreshProgress, progressMetrics, navigate, profile, onUpdateProfile }) {
@@ -281,10 +279,16 @@ export default function DailyPage({ onRefreshProgress, progressMetrics, navigate
   const [missionOffline, setMissionOffline] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
-  const [summary, setSummary] = useState(null);
-  const [running, setRunning] = useState(false);
-  const [reviewQuestions, setReviewQuestions] = useState(null);
   const [intensity, setIntensity] = useState('standard');
+  const [reviewQuestions, setReviewQuestions] = useState(null);
+
+  // Multi-phase flow: idle → math → verbal → complete
+  const [phase, setPhase] = useState('idle');
+  const [mathSummary, setMathSummary] = useState(null);
+  const [verbalSummary, setVerbalSummary] = useState(null);
+  const [verbalQuestions, setVerbalQuestions] = useState([]);
+  const [extraQuestions, setExtraQuestions] = useState(null);
+  const [extraMode, setExtraMode] = useState(null);
 
   // Restore saved mission on mount (e.g., after pause or page reload)
   useEffect(() => {
@@ -295,8 +299,11 @@ export default function DailyPage({ onRefreshProgress, progressMetrics, navigate
       setMissionQuestions(saved.missionQuestions || []);
       setMissionOffline(Boolean(saved.offline));
       if (saved.intensity) setIntensity(saved.intensity);
+      if (saved.verbalQuestions?.length) setVerbalQuestions(saved.verbalQuestions);
+      if (saved.phase && saved.phase !== 'idle') setPhase(saved.phase);
     }
   }, [today]);
+
   const planDay = getPlanDay(today);
   const currentPhase = getPhaseForDay(planDay);
   const missionMinutes = mission?.target_minutes || 55;
@@ -315,7 +322,6 @@ export default function DailyPage({ onRefreshProgress, progressMetrics, navigate
     const fromLocal = ids.map((id) => getQuestionById(id)).filter(Boolean);
     const merged = mergeQuestionsById([...fromApi, ...fromLocal]);
 
-    // Keep original task order stable.
     return ids
       .map((id) => merged.find((q) => q.id === id))
       .filter(Boolean);
@@ -330,11 +336,27 @@ export default function DailyPage({ onRefreshProgress, progressMetrics, navigate
       if (!raw) return false;
       const saved = JSON.parse(raw);
       if (Date.now() - saved.savedAt > 12 * 60 * 60 * 1000) return false;
-      // Check if question IDs match the current mission
       const missionIds = (mission?.tasks || []).flatMap((t) => t.question_ids || []).join(',');
-      return missionIds && saved.questionIds?.join(',') === missionIds;
+      const verbalIds = verbalQuestions.map((q) => q.id).join(',');
+      const savedIds = saved.questionIds?.join(',');
+      return savedIds && (savedIds === missionIds || savedIds === verbalIds);
     } catch { return false; }
-  }, [mission]);
+  }, [mission, verbalQuestions]);
+
+  function generateVerbalSet() {
+    const count = selectedIntensity.verbalCount;
+    const verbal = progressMetrics?.verbal;
+    if (verbal?.weak_skills?.length) {
+      return buildAdaptiveVerbalSet({
+        section: 'mixed',
+        count,
+        difficulty: 'all',
+        weakSkills: verbal.weak_skills,
+        strongSkills: verbal.strong_skills || [],
+      });
+    }
+    return buildVerbalSet({ section: 'mixed', count, difficulty: 'all' });
+  }
 
   async function fetchMission() {
     setBusy(true);
@@ -345,8 +367,14 @@ export default function DailyPage({ onRefreshProgress, progressMetrics, navigate
       setMissionMeta(data.mission_metadata || null);
       setMissionQuestions(data.questions || []);
       setMissionOffline(Boolean(data.offline));
-      setSummary(null);
-      // Persist so the mission survives page reload / pause
+      setPhase('idle');
+      setMathSummary(null);
+      setVerbalSummary(null);
+      setExtraQuestions(null);
+      // Generate verbal questions up front so they're ready
+      const vSet = generateVerbalSet();
+      setVerbalQuestions(vSet);
+      // Persist everything
       saveMissionState({
         planDate: today,
         mission: data.mission,
@@ -354,6 +382,8 @@ export default function DailyPage({ onRefreshProgress, progressMetrics, navigate
         missionQuestions: data.questions || [],
         offline: Boolean(data.offline),
         intensity: selectedIntensity.key,
+        verbalQuestions: vSet,
+        phase: 'idle',
       });
     } catch (err) {
       setError(err.message || 'Failed to generate mission');
@@ -365,10 +395,41 @@ export default function DailyPage({ onRefreshProgress, progressMetrics, navigate
   function handleReviewMistakes(missedIds) {
     const reviewSet = missedIds.map(getQuestionById).filter(Boolean);
     if (reviewSet.length) {
-      setSummary(null);
+      setMathSummary(null);
+      setVerbalSummary(null);
       setReviewQuestions(reviewSet);
     }
   }
+
+  function startExtraPractice(type) {
+    let questions;
+    if (type === 'math') {
+      questions = progressMetrics?.weak_skills?.length
+        ? buildAdaptivePracticeSet({ progressMetrics, count: 12 })
+        : buildPracticeSet({ count: 12, difficulty: 'all', domain: 'all', skill: 'all' });
+    } else {
+      questions = generateVerbalSet();
+    }
+    if (questions.length) {
+      setExtraQuestions(questions);
+      setExtraMode(type);
+    }
+  }
+
+  function savePhase(p) {
+    setPhase(p);
+    try {
+      const raw = window.localStorage.getItem(MISSION_SAVE_KEY);
+      if (raw) {
+        const saved = JSON.parse(raw);
+        saved.phase = p;
+        saved.savedAt = Date.now();
+        window.localStorage.setItem(MISSION_SAVE_KEY, JSON.stringify(saved));
+      }
+    } catch { /* ignore */ }
+  }
+
+  // --- Session renderers (take over the full page) ---
 
   if (reviewQuestions) {
     return (
@@ -380,32 +441,76 @@ export default function DailyPage({ onRefreshProgress, progressMetrics, navigate
         onExit={() => setReviewQuestions(null)}
         onFinish={(result) => {
           setReviewQuestions(null);
-          setSummary(result);
+          setMathSummary(result);
           onRefreshProgress?.();
         }}
       />
     );
   }
 
-  if (running && missionQuestionList.length) {
+  if (extraQuestions) {
     return (
       <SessionRunner
-        title={`Day ${planDay} Mission`}
+        title={`Extra ${extraMode === 'math' ? 'Math' : 'Verbal'} Practice`}
+        mode="practice"
+        questions={extraQuestions}
+        planDate={today}
+        onExit={() => setExtraQuestions(null)}
+        onFinish={(result) => {
+          setExtraQuestions(null);
+          setExtraMode(null);
+          onRefreshProgress?.();
+        }}
+      />
+    );
+  }
+
+  if (phase === 'math' && missionQuestionList.length) {
+    return (
+      <SessionRunner
+        title={`Day ${planDay} Math Mission`}
         mode="practice"
         questions={missionQuestionList}
         planDate={today}
         plannedTimeLabel={`${missionMinutes} min`}
         missionUpdate={{
           enabled: true,
-          status: 'complete',
+          status: 'in_progress',
           tasks: mission?.tasks || [],
           target_minutes: missionMinutes,
           completed_tasks: mission?.tasks?.length || 1,
         }}
-        onExit={() => setRunning(false)}
+        onExit={() => savePhase('idle')}
         onFinish={(result) => {
-          setRunning(false);
-          setSummary(result);
+          setMathSummary(result);
+          savePhase('verbal');
+          onRefreshProgress?.();
+        }}
+      />
+    );
+  }
+
+  if (phase === 'verbal' && verbalQuestions.length) {
+    const verbalMinutes = Math.round(verbalQuestions.length * 85 / 60);
+    return (
+      <SessionRunner
+        title={`Day ${planDay} Verbal Session`}
+        mode="practice"
+        questions={verbalQuestions}
+        planDate={today}
+        timeLimitSeconds={verbalQuestions.length * 85}
+        plannedTimeLabel={`${verbalMinutes} min`}
+        missionUpdate={{
+          enabled: true,
+          status: 'complete',
+          tasks: mission?.tasks || [],
+          target_minutes: missionMinutes + verbalMinutes,
+          completed_tasks: (mission?.tasks?.length || 1) + 1,
+        }}
+        onExit={() => savePhase('idle')}
+        onFinish={(result) => {
+          setVerbalSummary(result);
+          savePhase('complete');
           clearMissionState();
           onRefreshProgress?.();
         }}
@@ -429,7 +534,8 @@ export default function DailyPage({ onRefreshProgress, progressMetrics, navigate
       <SpacedReviewBanner today={today} onStartReview={(ids) => {
         const reviewSet = ids.map(getQuestionById).filter(Boolean);
         if (reviewSet.length) {
-          setSummary(null);
+          setMathSummary(null);
+          setVerbalSummary(null);
           setReviewQuestions(reviewSet);
         }
       }} />
@@ -438,7 +544,7 @@ export default function DailyPage({ onRefreshProgress, progressMetrics, navigate
         hasDiagnostic={hasDiagnostic}
         mission={mission}
         missionQuestionCount={missionQuestionList.length}
-        summary={summary}
+        phase={phase}
         navigate={navigate}
       />
 
@@ -452,31 +558,38 @@ export default function DailyPage({ onRefreshProgress, progressMetrics, navigate
         </div>
       ) : null}
 
-      <div style={{ marginTop: 12 }}>
-        <label style={{ fontSize: 13, fontWeight: 600, display: 'block', marginBottom: 6 }}>How much time today?</label>
-        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-          {INTENSITY_OPTIONS.map((opt) => (
-            <button
-              key={opt.key}
-              type="button"
-              className={`sat-btn ${intensity === opt.key ? 'sat-btn--primary' : 'sat-btn--ghost'}`}
-              style={{ fontSize: 13, padding: '6px 14px' }}
-              onClick={() => setIntensity(opt.key)}
-            >
-              {opt.label} ({opt.minutes} min, {opt.description})
-            </button>
-          ))}
+      {phase !== 'complete' ? (
+        <div style={{ marginTop: 12 }}>
+          <label style={{ fontSize: 13, fontWeight: 600, display: 'block', marginBottom: 6 }}>How much time today?</label>
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+            {INTENSITY_OPTIONS.map((opt) => (
+              <button
+                key={opt.key}
+                type="button"
+                className={`sat-btn ${intensity === opt.key ? 'sat-btn--primary' : 'sat-btn--ghost'}`}
+                style={{ fontSize: 13, padding: '6px 14px' }}
+                onClick={() => setIntensity(opt.key)}
+              >
+                {opt.label} — {opt.description}
+              </button>
+            ))}
+          </div>
         </div>
-      </div>
+      ) : null}
 
       <div className="sat-actions-row" style={{ marginTop: 12 }}>
-        <button type="button" className="sat-btn sat-btn--primary" onClick={fetchMission} disabled={busy}>
-          {busy ? 'Generating\u2026' : mission ? 'Regenerate Mission' : `Generate ${selectedIntensity.label} Mission`}
-        </button>
-        {missionQuestionList.length ? (
-          <button type="button" className="sat-btn" onClick={() => setRunning(true)}>
-            {hasPausedSession ? 'Resume' : 'Start'} Mission ({missionQuestionList.length} questions, ~{missionMinutes} min)
+        {phase !== 'complete' ? (
+          <button type="button" className="sat-btn sat-btn--primary" onClick={fetchMission} disabled={busy}>
+            {busy ? 'Generating\u2026' : mission ? 'Regenerate Mission' : `Generate ${selectedIntensity.label} Mission`}
           </button>
+        ) : null}
+        {missionQuestionList.length && phase === 'idle' ? (
+          <button type="button" className="sat-btn" onClick={() => savePhase('math')}>
+            {hasPausedSession ? 'Resume' : 'Start'} Mission ({missionQuestionList.length} math + {verbalQuestions.length} verbal Q)
+          </button>
+        ) : null}
+        {phase === 'verbal' && !verbalQuestions.length ? (
+          <span className="sat-muted">No verbal questions available — mission complete.</span>
         ) : null}
       </div>
 
@@ -494,6 +607,16 @@ export default function DailyPage({ onRefreshProgress, progressMetrics, navigate
               </div>
             </article>
           ))}
+          {verbalQuestions.length ? (
+            <article className="sat-task-card" style={{ borderLeft: '3px solid var(--sat-primary)' }}>
+              <h3>Verbal 700+ Drill</h3>
+              <p>Mixed reading and writing — adaptive to your weak verbal skills.</p>
+              <div className="sat-task-card__meta">
+                <span>{Math.round(verbalQuestions.length * 85 / 60)} min</span>
+                <span>{verbalQuestions.length} q</span>
+              </div>
+            </article>
+          ) : null}
         </div>
       ) : null}
 
@@ -507,35 +630,14 @@ export default function DailyPage({ onRefreshProgress, progressMetrics, navigate
       ) : null}
 
       <div className="sat-task-card" style={{ marginTop: 16, padding: 14 }}>
-        <h3>Your Daily Session Checklist</h3>
+        <h3>Your Daily Session</h3>
         <ol className="sat-list">
-          <li><strong>Generate mission</strong> — press the button above to build today's plan.</li>
-          <li><strong>Start mission</strong> — work all questions. Use Enter key and A/B/C/D shortcuts.</li>
+          <li><strong>Pick your time</strong> — choose Light, Standard, or Extended above.</li>
+          <li><strong>Generate and start</strong> — the app builds math + verbal in one flow.</li>
+          <li><strong>Work straight through</strong> — math first, then verbal auto-starts. Use Enter and A/B/C/D shortcuts.</li>
           <li><strong>Review every miss</strong> — read the coaching feedback and correct each error.</li>
-          <li><strong>Verbal 700+</strong> — switch to Verbal page for 15-20 min of reading/writing.</li>
-          <li><strong>Check Progress</strong> — see your updated score on the Progress page.</li>
+          <li><strong>Extra practice</strong> — if you have time, do a bonus round after you finish.</li>
         </ol>
-      </div>
-
-      <div className="sat-grid-2" style={{ marginTop: 16 }}>
-        <article className="sat-task-card">
-          <h3>Foolproof Math Protocol</h3>
-          <ol className="sat-list">
-            <li>Start with warmup misses, then adaptive drill, then timed block.</li>
-            <li>For each miss, classify it: concept gap, setup error, or time panic.</li>
-            <li>Rework every miss correctly before ending the session.</li>
-            <li>Write two rules to apply tomorrow before signing off.</li>
-          </ol>
-        </article>
-        <article className="sat-task-card">
-          <h3>Verbal Add-On (20 min)</h3>
-          <ol className="sat-list">
-            <li>Run the Verbal 700+ page after math at least 5 days/week.</li>
-            <li>Alternate reading and writing focus days.</li>
-            <li>Keep pace under 85 sec/question with evidence-based choices.</li>
-            <li>Aim for verbal 700+ while math climbs to 650-700.</li>
-          </ol>
-        </article>
       </div>
 
       {weakSkillRows.length ? (
@@ -554,8 +656,33 @@ export default function DailyPage({ onRefreshProgress, progressMetrics, navigate
         </div>
       ) : null}
 
-      {summary ? (
-        <SessionSummary summary={summary} onDismiss={() => setSummary(null)} onReviewMistakes={handleReviewMistakes} />
+      {mathSummary ? (
+        <SessionSummary summary={mathSummary} onDismiss={() => setMathSummary(null)} onReviewMistakes={handleReviewMistakes} />
+      ) : null}
+
+      {verbalSummary ? (
+        <div style={{ marginTop: 16 }}>
+          <h3>Verbal Session Results</h3>
+          <SessionSummary summary={verbalSummary} onDismiss={() => setVerbalSummary(null)} />
+        </div>
+      ) : null}
+
+      {phase === 'complete' ? (
+        <div className="sat-next-step" style={{ marginTop: 16, borderColor: 'var(--sat-success)' }}>
+          <div className="sat-next-step__badge" style={{ background: 'var(--sat-success)' }}>EXTRA PRACTICE</div>
+          <h3 className="sat-next-step__heading">Got more time?</h3>
+          <p className="sat-next-step__detail">
+            Your daily mission is done. If you want to keep going, pick a bonus round below.
+          </p>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            <button type="button" className="sat-btn sat-btn--primary" onClick={() => startExtraPractice('math')}>
+              Bonus Math (12 Q)
+            </button>
+            <button type="button" className="sat-btn" onClick={() => startExtraPractice('verbal')}>
+              Bonus Verbal ({selectedIntensity.verbalCount} Q)
+            </button>
+          </div>
+        </div>
       ) : null}
 
       <MistakeJournal />
