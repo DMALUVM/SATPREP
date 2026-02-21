@@ -346,14 +346,14 @@ function evidenceTemplate(seed) {
 }
 
 const TEMPLATE_PLAN = [
-  ['agreement', 24, agreementTemplate],
-  ['punctuation', 20, punctuationTemplate],
-  ['transition', 20, transitionTemplate],
-  ['concision', 18, concisionTemplate],
-  ['main-idea', 20, mainIdeaTemplate],
-  ['inference', 18, inferenceTemplate],
-  ['vocab', 16, vocabTemplate],
-  ['evidence', 16, evidenceTemplate],
+  ['agreement', 40, agreementTemplate],
+  ['punctuation', 36, punctuationTemplate],
+  ['transition', 34, transitionTemplate],
+  ['concision', 30, concisionTemplate],
+  ['main-idea', 32, mainIdeaTemplate],
+  ['inference', 30, inferenceTemplate],
+  ['vocab', 24, vocabTemplate],
+  ['evidence', 24, evidenceTemplate],
 ];
 
 export const VERBAL_QUESTION_BANK = TEMPLATE_PLAN.flatMap(([key, count, factory]) => {

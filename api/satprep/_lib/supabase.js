@@ -97,9 +97,26 @@ export async function ensureSatProfile(serviceClient, userId, roleHint = 'studen
 
 export function resolveStudentId(profile, explicitStudentId = null) {
   if (!profile) return null;
+
   if (profile.role === 'parent') {
-    return explicitStudentId || profile.linked_student_id || null;
+    const linkedStudentId = profile.linked_student_id || null;
+    if (!linkedStudentId) return null;
+
+    if (explicitStudentId && explicitStudentId !== linkedStudentId) {
+      const err = new Error('Forbidden: parent may access only linked student.');
+      err.status = 403;
+      throw err;
+    }
+
+    return linkedStudentId;
   }
+
+  if (explicitStudentId && explicitStudentId !== profile.user_id) {
+    const err = new Error('Forbidden');
+    err.status = 403;
+    throw err;
+  }
+
   return profile.user_id;
 }
 

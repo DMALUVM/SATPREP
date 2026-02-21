@@ -2,7 +2,6 @@ import React, { useMemo, useState } from 'react';
 import SessionRunner from '../components/SessionRunner';
 import { buildAdaptiveVerbalSet, buildVerbalSet, getVerbalStats } from '../content/verbalQuestionBank';
 import { estimateSessionFromConfig } from '../lib/sessionTime';
-import { computeVerbalMetrics, getVerbalProgress, recordVerbalSession } from '../lib/verbalProgress';
 
 const STRATEGY_PLAYBOOK = [
   {
@@ -39,21 +38,80 @@ const STRATEGY_PLAYBOOK = [
   },
 ];
 
-export default function VerbalPage() {
+const VERBAL_SKILL_COACH = {
+  'main-idea': [
+    'Summarize passage claim in 8-12 words before viewing choices.',
+    'Reject choices that are narrower or broader than the passage claim.',
+  ],
+  inference: [
+    'Only choose conclusions supported by direct text evidence.',
+    'If you cannot underline proof for a choice, eliminate it.',
+  ],
+  'vocab-in-context': [
+    'Replace the word with each choice and re-read sentence meaning.',
+    'Match tone and context, not dictionary familiarity alone.',
+  ],
+  'textual-evidence': [
+    'Find proof line first, then pick answer aligned to that line.',
+    'Avoid true-but-irrelevant details.',
+  ],
+  'subject-verb-agreement': [
+    'Find the true subject, then match singular/plural verb.',
+    'Ignore interrupting phrases between subject and verb.',
+  ],
+  'punctuation-boundaries': [
+    'Identify whether each side is an independent clause.',
+    'Use semicolon/period/conjunction rules to avoid comma splice traps.',
+  ],
+  'logical-transitions': [
+    'Name the relationship first: contrast, cause, continuation, or example.',
+    'Pick transition matching that relationship exactly.',
+  ],
+  concision: [
+    'Remove redundancy after grammar is correct.',
+    'Prefer the clearest shortest choice that preserves meaning.',
+  ],
+};
+
+function buildDefaultVerbalMetrics() {
+  return {
+    predicted_verbal_score: 0,
+    attempts: 0,
+    correct: 0,
+    accuracy_pct: 0,
+    pace_seconds: 0,
+    weak_skills: [],
+    strong_skills: [],
+  };
+}
+
+export default function VerbalPage({ progressMetrics, onRefreshProgress }) {
   const [section, setSection] = useState('mixed');
   const [difficulty, setDifficulty] = useState('all');
   const [count, setCount] = useState(22);
   const [runningSet, setRunningSet] = useState(null);
   const [sessionSummary, setSessionSummary] = useState(null);
-  const [progressVersion, setProgressVersion] = useState(0);
   const [useAdaptive, setUseAdaptive] = useState(true);
 
   const stats = useMemo(() => getVerbalStats(), []);
-  const metrics = useMemo(() => computeVerbalMetrics(getVerbalProgress()), [progressVersion]);
+  const metrics = progressMetrics?.verbal || buildDefaultVerbalMetrics();
+  const weakSkills = metrics.weak_skills || [];
+  const strongSkills = metrics.strong_skills || [];
   const estimate = useMemo(
     () => estimateSessionFromConfig({ count, difficulty, section: 'verbal' }),
     [count, difficulty]
   );
+
+  const focusInstructions = useMemo(() => {
+    return weakSkills.slice(0, 3).map((row) => ({
+      skill: row.skill,
+      mastery: Number(row.mastery_score || 0).toFixed(1),
+      steps: VERBAL_SKILL_COACH[row.skill] || [
+        'Do one slow untimed rep focused on evidence and structure.',
+        'Do one timed rep and keep pace under 85s/question.',
+      ],
+    }));
+  }, [weakSkills]);
 
   const timeLimitSeconds = useMemo(() => {
     const perQuestion = section === 'verbal-writing' ? 75 : 85;
@@ -72,8 +130,7 @@ export default function VerbalPage() {
         onFinish={(result) => {
           setRunningSet(null);
           setSessionSummary(result);
-          recordVerbalSession(result, { section, difficulty, count, timeLimitSeconds });
-          setProgressVersion((v) => v + 1);
+          onRefreshProgress?.();
         }}
       />
     );
@@ -93,17 +150,17 @@ export default function VerbalPage() {
       <div className="sat-stats-grid" style={{ marginBottom: 14 }}>
         <article className="sat-stat sat-stat--primary">
           <div className="sat-stat__label">Estimated Verbal</div>
-          <div className="sat-stat__value">{metrics.estimatedVerbalScore}</div>
+          <div className="sat-stat__value">{metrics.predicted_verbal_score || 0}</div>
           <div className="sat-stat__detail">Goal: 700+</div>
         </article>
         <article className="sat-stat">
           <div className="sat-stat__label">Accuracy</div>
-          <div className="sat-stat__value">{metrics.accuracy}%</div>
-          <div className="sat-stat__detail">{metrics.correct}/{metrics.attempts} correct</div>
+          <div className="sat-stat__value">{metrics.accuracy_pct || 0}%</div>
+          <div className="sat-stat__detail">{metrics.correct || 0}/{metrics.attempts || 0} correct</div>
         </article>
         <article className="sat-stat">
           <div className="sat-stat__label">Pace</div>
-          <div className="sat-stat__value">{metrics.avgPace || 0}s</div>
+          <div className="sat-stat__value">{metrics.pace_seconds || 0}s</div>
           <div className="sat-stat__detail">Target: ≤85s</div>
         </article>
         <article className="sat-stat">
@@ -113,10 +170,10 @@ export default function VerbalPage() {
         </article>
       </div>
 
-      {useAdaptive && metrics.weakSkills.length ? (
+      {useAdaptive && weakSkills.length ? (
         <div className="sat-alert">
-          Adaptive verbal focus is ON. Priority skills: {metrics.weakSkills.slice(0, 3).map((row) => row.skill).join(', ')}.
-          {metrics.strongSkills.length ? ` Deprioritizing: ${metrics.strongSkills.slice(0, 2).map((row) => row.skill).join(', ')}.` : ''}
+          Adaptive verbal focus is ON. Priority skills: {weakSkills.slice(0, 3).map((row) => row.skill).join(', ')}.
+          {strongSkills.length ? ` Deprioritizing: ${strongSkills.slice(0, 2).map((row) => row.skill).join(', ')}.` : ''}
         </div>
       ) : null}
 
@@ -174,8 +231,8 @@ export default function VerbalPage() {
                 section,
                 count,
                 difficulty,
-                weakSkills: metrics.weakSkills,
-                strongSkills: metrics.strongSkills,
+                weakSkills,
+                strongSkills,
               })
               : buildVerbalSet({ section, count, difficulty });
             setRunningSet(set);
@@ -185,10 +242,26 @@ export default function VerbalPage() {
         </button>
       </div>
 
+      {focusInstructions.length ? (
+        <div className="sat-panel" style={{ marginTop: 8 }}>
+          <h3>Today\'s Verbal Coaching Priorities</h3>
+          {focusInstructions.map((row) => (
+            <article key={row.skill} className="sat-task-card" style={{ marginTop: 10 }}>
+              <strong>{row.skill}</strong> (mastery {row.mastery})
+              <ol className="sat-list" style={{ marginTop: 8 }}>
+                {row.steps.map((step) => (
+                  <li key={`${row.skill}-${step.slice(0, 18)}`}>{step}</li>
+                ))}
+              </ol>
+            </article>
+          ))}
+        </div>
+      ) : null}
+
       {sessionSummary ? (
         <div className="sat-alert sat-alert--success">
           Verbal session complete: {sessionSummary.correctCount}/{sessionSummary.totalCount} ({sessionSummary.accuracyPct}%),
-          pace {sessionSummary.avgSeconds}s.
+          attempted {sessionSummary.attemptedCount}, pace {sessionSummary.avgSeconds}s.
         </div>
       ) : null}
 

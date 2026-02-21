@@ -147,14 +147,18 @@ export default function SatPrepApp() {
   }
 
   function renderPage() {
-    if (route === '/daily' || route === '/') return <DailyPage onRefreshProgress={refreshProgress} />;
+    if (route === '/daily' || route === '/') {
+      return <DailyPage onRefreshProgress={refreshProgress} progressMetrics={progress?.metrics} />;
+    }
     if (route === '/diagnostic') return <DiagnosticPage onRefreshProgress={refreshProgress} />;
     if (route === '/practice') {
       return <PracticePage onRefreshProgress={refreshProgress} progressMetrics={progress?.metrics} />;
     }
     if (route === '/timed') return <TimedPage onRefreshProgress={refreshProgress} />;
     if (route === '/review') return <ReviewPage progressMetrics={progress?.metrics} onRefreshProgress={refreshProgress} />;
-    if (route === '/verbal') return <VerbalPage />;
+    if (route === '/verbal') {
+      return <VerbalPage progressMetrics={progress?.metrics} onRefreshProgress={refreshProgress} />;
+    }
     if (route === '/progress') return <ProgressPage progress={progress} userId={session.user.id} />;
     if (route === '/parent') return <ParentPage profile={profile} />;
     return <NotFoundPage />;

@@ -1,7 +1,7 @@
 /**
  * @typedef {Object} SatQuestion
  * @property {string} id
- * @property {'algebra'|'advanced-math'|'problem-solving-data'|'geometry-trig'} domain
+ * @property {'algebra'|'advanced-math'|'problem-solving-data'|'geometry-trig'|'verbal-reading'|'verbal-writing'} domain
  * @property {string} skill
  * @property {1|2|3|4|5} difficulty
  * @property {'multiple_choice'|'grid_in'} format
@@ -9,7 +9,7 @@
  * @property {boolean} calculator_allowed
  * @property {string} stem
  * @property {string[]} [choices]
- * @property {number|string} answer_key
+ * @property {number|string} [answer_key]
  * @property {string[]} explanation_steps
  * @property {string} strategy_tip
  * @property {string} trap_tag
@@ -51,7 +51,7 @@
  * @property {Array<{type: string, label: string, question_ids: string[], target_minutes: number}>} tasks
  * @property {number} target_minutes
  * @property {'pending'|'in_progress'|'complete'} status
- * @property {{completed_tasks: number, accuracy: number, pace_seconds: number}} completion_summary
+ * @property {{completed_tasks: number, attempted_count?: number, accuracy: number, pace_seconds: number}} completion_summary
  */
 
 /**
@@ -60,7 +60,7 @@
  * @property {string} week_start
  * @property {string[]} highlights
  * @property {string[]} risks
- * @property {{predicted_math_score: number, weekly_accuracy: number, pace_seconds: number}} score_trend
+ * @property {{predicted_math_score: number, predicted_verbal_score?: number, weekly_accuracy: number, pace_seconds: number}} score_trend
  * @property {Record<string, {accuracy: number, attempts: number}>} domain_breakdown
  * @property {string[]} recommended_actions
  */

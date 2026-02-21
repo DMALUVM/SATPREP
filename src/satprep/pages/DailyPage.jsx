@@ -4,6 +4,37 @@ import { generateDailyMission } from '../lib/apiClient';
 import { getQuestionById } from '../lib/selection';
 import { friendlyDate, getPlanDay, getWeekForDay, toDateKey } from '../lib/time';
 
+const COACH_PLAYBOOK = {
+  'linear-equations': [
+    'Isolate variables one operation at a time and keep equality balanced.',
+    'Substitute the solved value back immediately to verify.',
+  ],
+  systems: [
+    'Choose elimination when coefficients align; otherwise substitute.',
+    'After solving, check both original equations quickly.',
+  ],
+  inequalities: [
+    'Treat like equations but flip the sign when multiplying/dividing by negative.',
+    'Test one value from your final interval to confirm direction.',
+  ],
+  quadratics: [
+    'First factor if possible; if not, use quadratic formula cleanly.',
+    'Verify roots in original form to avoid sign slips.',
+  ],
+  functions: [
+    'Track input-output mapping and evaluate inside-out for composition.',
+    'When comparing functions, anchor on rate and intercept behavior.',
+  ],
+  percentages: [
+    'Translate percent statements into equations before calculating.',
+    'Use multiplier form (1 +/- r) for fast growth/decay questions.',
+  ],
+  statistics: [
+    'Separate mean/median spread questions before computing.',
+    'Estimate first, then compute exact value to catch arithmetic errors.',
+  ],
+};
+
 function uniqueById(items) {
   const map = new Map();
   items.forEach((item) => {
@@ -13,7 +44,22 @@ function uniqueById(items) {
   return [...map.values()];
 }
 
-export default function DailyPage({ onRefreshProgress }) {
+function buildSkillActionRow(row) {
+  const skill = row?.skill || 'unknown-skill';
+  const mastery = Number(row?.mastery_score || 0).toFixed(1);
+  const instructions = COACH_PLAYBOOK[skill] || [
+    'Solve slowly once for setup accuracy, then repeat once at timer pace.',
+    'Write one mistake pattern and one prevention rule before ending session.',
+  ];
+
+  return {
+    skill,
+    mastery,
+    instructions,
+  };
+}
+
+export default function DailyPage({ onRefreshProgress, progressMetrics }) {
   const [mission, setMission] = useState(null);
   const [missionMeta, setMissionMeta] = useState(null);
   const [missionQuestions, setMissionQuestions] = useState([]);
@@ -26,6 +72,7 @@ export default function DailyPage({ onRefreshProgress }) {
   const planDay = getPlanDay(today);
   const planWeek = getWeekForDay(planDay);
   const missionMinutes = mission?.target_minutes || 55;
+  const weakSkillRows = (progressMetrics?.weak_skills || []).slice(0, 3).map(buildSkillActionRow);
   const weekFocus =
     planWeek === 1
       ? 'Week 1 Foundation: equations, graphing, systems, and clean setup.'
@@ -66,6 +113,14 @@ export default function DailyPage({ onRefreshProgress }) {
         mode="practice"
         questions={missionQuestionList}
         planDate={today}
+        plannedTimeLabel={`${missionMinutes} min`}
+        missionUpdate={{
+          enabled: true,
+          status: 'complete',
+          tasks: mission?.tasks || [],
+          target_minutes: missionMinutes,
+          completed_tasks: mission?.tasks?.length || 1,
+        }}
         onExit={() => setRunning(false)}
         onFinish={(result) => {
           setRunning(false);
@@ -125,10 +180,10 @@ export default function DailyPage({ onRefreshProgress }) {
         <article className="sat-task-card">
           <h3>Foolproof Math Protocol</h3>
           <ol className="sat-list">
-            <li>Start with warmup mistakes, then adaptive drill, then timed block.</li>
-            <li>Mark every miss as one of: concept gap, setup error, or time panic.</li>
+            <li>Start with warmup misses, then adaptive drill, then timed block.</li>
+            <li>For each miss, classify it: concept gap, setup error, or time panic.</li>
             <li>Rework every miss correctly before ending the session.</li>
-            <li>Log two rules to apply tomorrow before signing off.</li>
+            <li>Write two rules to apply tomorrow before signing off.</li>
           </ol>
         </article>
         <article className="sat-task-card">
@@ -142,10 +197,26 @@ export default function DailyPage({ onRefreshProgress }) {
         </article>
       </div>
 
+      {weakSkillRows.length ? (
+        <div className="sat-panel" style={{ marginTop: 16 }}>
+          <h3>Coach Priorities For Today</h3>
+          {weakSkillRows.map((row) => (
+            <article key={row.skill} className="sat-task-card" style={{ marginTop: 10 }}>
+              <strong>{row.skill}</strong> (mastery {row.mastery})
+              <ol className="sat-list" style={{ marginTop: 8 }}>
+                {row.instructions.map((step) => (
+                  <li key={`${row.skill}-${step.slice(0, 18)}`}>{step}</li>
+                ))}
+              </ol>
+            </article>
+          ))}
+        </div>
+      ) : null}
+
       {summary ? (
         <div className="sat-alert sat-alert--success" style={{ marginTop: 16 }}>
-          Mission block complete: {summary.correctCount}/{summary.totalCount} ({summary.accuracyPct}%),
-          pace {summary.avgSeconds}s.
+          Mission complete: {summary.correctCount}/{summary.totalCount} ({summary.accuracyPct}%),
+          attempted {summary.attemptedCount}, pace {summary.avgSeconds}s.
         </div>
       ) : null}
     </section>

@@ -88,7 +88,6 @@ export default async function handler(req, res) {
         format: q.format,
         stem: q.stem,
         choices: q.choices,
-        answer_key: q.answer_key,
         explanation_steps: q.explanation_steps,
         strategy_tip: q.strategy_tip,
         trap_tag: q.trap_tag,

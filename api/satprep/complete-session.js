@@ -64,8 +64,15 @@ export default async function handler(req, res) {
     const planDate = req.body?.plan_date;
     let mission = null;
     if (planDate) {
-      const status = req.body?.mission_status || 'in_progress';
-      const completionSummary = req.body?.completion_summary || {
+      const { data: existingMission } = await service
+        .from('sat_daily_missions')
+        .select('*')
+        .eq('student_id', studentId)
+        .eq('plan_date', planDate)
+        .maybeSingle();
+
+      const status = req.body?.mission_status || existingMission?.status || 'in_progress';
+      const completionSummary = req.body?.completion_summary || existingMission?.completion_summary || {
         completed_tasks: Number(req.body?.completed_tasks || 0),
         accuracy: Number(accuracyPct.toFixed(1)),
         pace_seconds: Number(avgSeconds.toFixed(1)),
@@ -77,8 +84,8 @@ export default async function handler(req, res) {
           {
             student_id: studentId,
             plan_date: planDate,
-            tasks: req.body?.tasks || [],
-            target_minutes: Number(req.body?.target_minutes || 55),
+            tasks: Array.isArray(req.body?.tasks) ? req.body.tasks : existingMission?.tasks || [],
+            target_minutes: Number(req.body?.target_minutes || existingMission?.target_minutes || 55),
             status,
             completion_summary: completionSummary,
             updated_at: nowIso,

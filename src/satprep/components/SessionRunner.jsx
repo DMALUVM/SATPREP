@@ -6,7 +6,12 @@ function normalizeGridAnswer(value) {
   return String(value || '').trim().replace(/\s+/g, '');
 }
 
+function hasAnswerKey(question) {
+  return typeof question?.answer_key !== 'undefined' && question?.answer_key !== null;
+}
+
 function isAnswerCorrect(question, answer) {
+  if (!hasAnswerKey(question)) return false;
   if (question.format === 'multiple_choice') {
     return Number(answer) === Number(question.answer_key);
   }
@@ -28,6 +33,7 @@ export default function SessionRunner({
   timeLimitSeconds = 0,
   plannedTimeLabel = '',
   persistApi = true,
+  missionUpdate = null,
   onFinish,
   onExit,
   coachTone = 'firm-supportive',
@@ -40,6 +46,7 @@ export default function SessionRunner({
   const [questionStart, setQuestionStart] = useState(() => Date.now());
   const [secondsElapsed, setSecondsElapsed] = useState(0);
   const [sessionBusy, setSessionBusy] = useState(false);
+  const [warning, setWarning] = useState('');
 
   const currentQuestion = questions[index] || null;
 
@@ -82,34 +89,44 @@ export default function SessionRunner({
     const rawAnswer = currentQuestion.format === 'multiple_choice' ? currentInput : normalizeGridAnswer(currentInput);
     if (rawAnswer === '' || rawAnswer === null || rawAnswer === undefined) return;
 
-    const isCorrect = isAnswerCorrect(currentQuestion, rawAnswer);
+    setWarning('');
+
+    let resolvedCorrect = isAnswerCorrect(currentQuestion, rawAnswer);
     const secondsSpent = Math.max(1, Math.floor((Date.now() - questionStart) / 1000));
 
     if (persistApi) {
       setSessionBusy(true);
       try {
-        await submitAttempt({
+        const response = await submitAttempt({
           question_id: currentQuestion.id,
           session_mode: mode,
-          is_correct: isCorrect,
           seconds_spent: secondsSpent,
           response_payload: { answer: rawAnswer },
         });
+
+        if (typeof response?.attempt?.is_correct === 'boolean') {
+          resolvedCorrect = response.attempt.is_correct;
+        }
       } catch (error) {
-        // Keep local progress even if network call fails; student should not be blocked.
+        if (!hasAnswerKey(currentQuestion)) {
+          setWarning('Temporary network issue. Retry submit so this answer can be graded correctly.');
+          setSessionBusy(false);
+          return;
+        }
+        // Keep local progress if network call fails and local key exists.
         // eslint-disable-next-line no-console
         console.warn('submitAttempt failed:', error.message);
+        setWarning('Network issue: saved locally for now.');
+      } finally {
+        setSessionBusy(false);
       }
-
-      setSessionBusy(false);
     }
 
     setAnswers((prev) => ({ ...prev, [currentQuestion.id]: rawAnswer }));
     setSubmitted((prev) => ({
       ...prev,
-      [currentQuestion.id]: { isCorrect, secondsSpent, answer: rawAnswer },
+      [currentQuestion.id]: { isCorrect: resolvedCorrect, secondsSpent, answer: rawAnswer },
     }));
-
   }
 
   async function nextQuestion() {
@@ -132,13 +149,15 @@ export default function SessionRunner({
     setSessionBusy(persistApi);
 
     const submittedEntries = Object.entries(submitted);
-    const totalCount = submittedEntries.length;
+    const attemptedCount = submittedEntries.length;
+    const totalCount = questions.length;
     const correctCount = submittedEntries.filter(([, value]) => value.isCorrect).length;
     const avgSeconds = submittedEntries.length
       ? submittedEntries.reduce((sum, [, value]) => sum + value.secondsSpent, 0) / submittedEntries.length
       : 0;
     const skillBreakdown = {};
     const domainBreakdown = {};
+
     submittedEntries.forEach(([questionId, value]) => {
       const question = questions.find((q) => q.id === questionId);
       if (!question) return;
@@ -160,23 +179,31 @@ export default function SessionRunner({
     });
 
     if (persistApi) {
+      const completionPayload = {
+        mode,
+        started_at: new Date(sessionStart).toISOString(),
+        completed_at: new Date().toISOString(),
+        question_ids: questions.map((q) => q.id),
+        correct_count: correctCount,
+        total_count: totalCount,
+        avg_seconds: Number(avgSeconds.toFixed(2)),
+      };
+
+      if (missionUpdate?.enabled && planDate) {
+        completionPayload.plan_date = planDate;
+        completionPayload.mission_status = missionUpdate.status || 'complete';
+        completionPayload.tasks = missionUpdate.tasks || [];
+        completionPayload.target_minutes = Number(missionUpdate.target_minutes || 55);
+        completionPayload.completion_summary = {
+          completed_tasks: Number(missionUpdate.completed_tasks || 1),
+          attempted_count: attemptedCount,
+          accuracy: totalCount ? Math.round((correctCount / totalCount) * 100) : 0,
+          pace_seconds: Number(avgSeconds.toFixed(1)),
+        };
+      }
+
       try {
-        await completeSession({
-          mode,
-          started_at: new Date(sessionStart).toISOString(),
-          completed_at: new Date().toISOString(),
-          question_ids: questions.map((q) => q.id),
-          correct_count: correctCount,
-          total_count: totalCount,
-          avg_seconds: Number(avgSeconds.toFixed(2)),
-          plan_date: planDate,
-          mission_status: 'in_progress',
-          completion_summary: {
-            completed_tasks: 1,
-            accuracy: totalCount ? Math.round((correctCount / totalCount) * 100) : 0,
-            pace_seconds: Number(avgSeconds.toFixed(1)),
-          },
-        });
+        await completeSession(completionPayload);
       } catch (error) {
         // eslint-disable-next-line no-console
         console.warn('completeSession failed:', error.message);
@@ -187,6 +214,7 @@ export default function SessionRunner({
 
     onFinish?.({
       totalCount,
+      attemptedCount,
       correctCount,
       accuracyPct: totalCount ? Math.round((correctCount / totalCount) * 100) : 0,
       avgSeconds: Number(avgSeconds.toFixed(1)),
@@ -284,6 +312,8 @@ export default function SessionRunner({
             End Session
           </button>
         </div>
+
+        {warning ? <div className="sat-alert">{warning}</div> : null}
 
         {review ? (
           <div className={`sat-feedback ${review.isCorrect ? 'is-correct' : 'is-incorrect'}`}>

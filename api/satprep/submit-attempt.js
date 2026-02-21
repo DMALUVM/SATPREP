@@ -8,6 +8,19 @@ import {
 } from './_lib/supabase.js';
 import { buildMasteryUpdate, buildQuestionLookup, loadQuestionPool } from './_lib/engine.js';
 
+const ALLOWED_SESSION_MODES = new Set(['diagnostic', 'practice', 'timed', 'review']);
+
+function normalizeGridAnswer(value) {
+  return String(value ?? '').trim().replace(/\s+/g, '');
+}
+
+function gradeAttempt(question, answer) {
+  if (question.format === 'multiple_choice') {
+    return Number(answer) === Number(question.answer_key);
+  }
+  return normalizeGridAnswer(answer) === normalizeGridAnswer(question.answer_key);
+}
+
 export default async function handler(req, res) {
   if (!methodGuard(req, res, 'POST')) return;
 
@@ -23,16 +36,21 @@ export default async function handler(req, res) {
     const questionId = req.body?.question_id;
     const sessionMode = req.body?.session_mode || 'practice';
     const secondsSpent = Math.max(1, Number(req.body?.seconds_spent || 0));
-    const isCorrect = !!req.body?.is_correct;
-    const responsePayload = req.body?.response_payload || { answer: null };
     const sessionId = req.body?.session_id || null;
+    const rawAnswer = req.body?.response_payload?.answer ?? null;
 
     if (!questionId) return res.status(400).json({ error: 'question_id is required.' });
+    if (!ALLOWED_SESSION_MODES.has(sessionMode)) {
+      return res.status(400).json({ error: 'Invalid session_mode.' });
+    }
 
     const questionPool = await loadQuestionPool(service);
     const lookup = buildQuestionLookup(questionPool);
     const question = lookup.get(questionId);
     if (!question) return res.status(404).json({ error: `Question not found: ${questionId}` });
+
+    const isCorrect = gradeAttempt(question, rawAnswer);
+    const responsePayload = { answer: rawAnswer };
 
     const attemptInsert = {
       student_id: studentId,

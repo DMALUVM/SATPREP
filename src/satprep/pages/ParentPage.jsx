@@ -83,8 +83,9 @@ export default function ParentPage({ profile }) {
           <article className="sat-task-card">
             <h3>Score Trend</h3>
             <p>Predicted math: {report.score_trend?.predicted_math_score}</p>
-            <p>Weekly accuracy: {report.score_trend?.weekly_accuracy}%</p>
-            <p>Pace: {report.score_trend?.pace_seconds}s</p>
+            <p>Predicted verbal: {report.score_trend?.predicted_verbal_score || 0}</p>
+            <p>Weekly math accuracy: {report.score_trend?.weekly_accuracy}%</p>
+            <p>Math pace: {report.score_trend?.pace_seconds}s</p>
             <p>Week start: {report.week_start}</p>
           </article>
         </div>
