@@ -156,6 +156,36 @@
   margin-bottom: 8px;
 }
 
+
+.sat-auth__mode {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 12px;
+}
+
+.sat-auth__mode-btn {
+  border: 1px solid var(--sat-line);
+  background: #fff;
+  color: var(--sat-ink);
+  border-radius: 999px;
+  padding: 8px 12px;
+  font: inherit;
+  cursor: pointer;
+  transition: 160ms ease;
+}
+
+.sat-auth__mode-btn:hover {
+  transform: translateY(-1px);
+}
+
+.sat-auth__mode-btn.is-active {
+  border-color: var(--sat-primary);
+  background: rgba(10, 127, 116, 0.1);
+  color: var(--sat-primary-dark);
+  font-weight: 600;
+}
+
 .sat-auth__form {
   display: grid;
   gap: 10px;
