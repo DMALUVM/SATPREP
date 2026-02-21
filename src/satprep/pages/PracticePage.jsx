@@ -28,7 +28,7 @@ export default function PracticePage({ onRefreshProgress, progressMetrics }) {
   if (sessionQuestions) {
     return (
       <SessionRunner
-        title="Adaptive Practice"
+        title={useAdaptive ? 'Adaptive Practice' : 'Practice Session'}
         mode="practice"
         questions={sessionQuestions}
         planDate={toDateKey()}

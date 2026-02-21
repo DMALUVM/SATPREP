@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import SessionRunner from '../components/SessionRunner';
+import SessionSummary from '../components/SessionSummary';
 import { buildTimedSet } from '../lib/selection';
 import { toDateKey } from '../lib/time';
 
@@ -45,9 +46,7 @@ export default function TimedPage({ onRefreshProgress }) {
         Start Timed Simulation
       </button>
       {summary ? (
-        <div className="sat-alert sat-alert--success" style={{ marginTop: 16 }}>
-          Timed set complete: {summary.correctCount}/{summary.totalCount} ({summary.accuracyPct}%), pace {summary.avgSeconds}s.
-        </div>
+        <SessionSummary summary={summary} onDismiss={() => setSummary(null)} />
       ) : null}
     </section>
   );

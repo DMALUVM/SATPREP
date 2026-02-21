@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import SessionRunner from '../components/SessionRunner';
+import SessionSummary from '../components/SessionSummary';
 import { generateDailyMission } from '../lib/apiClient';
 import { getQuestionById } from '../lib/selection';
 import { friendlyDate, getPlanDay, getWeekForDay, toDateKey } from '../lib/time';
@@ -63,6 +64,50 @@ function buildSkillActionRow(row) {
   };
 }
 
+function NextStepBanner({ hasDiagnostic, mission, missionQuestionCount, summary, navigate }) {
+  let stepNumber = 1;
+  let heading = '';
+  let detail = '';
+  let action = null;
+
+  if (!hasDiagnostic) {
+    heading = 'Step 1: Run Your Diagnostic';
+    detail = 'You have not run a diagnostic yet. This 24-question baseline test tells the app exactly where you are strong and weak so it can build your custom daily plan.';
+    action = (
+      <button type="button" className="sat-btn sat-btn--primary" onClick={() => navigate('/diagnostic')}>
+        Go to Diagnostic
+      </button>
+    );
+  } else if (!mission) {
+    heading = 'Step 1: Generate Today\'s Mission';
+    detail = 'Press the button below to build your personalized daily plan. The app will target your weakest skills first.';
+    action = null; // The generate button is below
+  } else if (missionQuestionCount > 0 && !summary) {
+    heading = 'Step 2: Start Your Mission';
+    detail = `Your mission is ready with ${missionQuestionCount} questions. Press Start Mission below, then work through each question. Use Enter key to submit answers quickly.`;
+    action = null; // The start button is below
+  } else if (summary) {
+    heading = 'Step 3: Do Your Verbal Session';
+    detail = 'Math mission complete. Now switch to Verbal 700+ for a 15-20 minute reading and writing drill. Do this at least 5 days per week.';
+    action = (
+      <button type="button" className="sat-btn sat-btn--primary" onClick={() => navigate('/verbal')}>
+        Go to Verbal 700+
+      </button>
+    );
+  }
+
+  if (!heading) return null;
+
+  return (
+    <div className="sat-next-step">
+      <div className="sat-next-step__badge">DO THIS NOW</div>
+      <h3 className="sat-next-step__heading">{heading}</h3>
+      <p className="sat-next-step__detail">{detail}</p>
+      {action}
+    </div>
+  );
+}
+
 export default function DailyPage({ onRefreshProgress, progressMetrics }) {
   const [mission, setMission] = useState(null);
   const [missionMeta, setMissionMeta] = useState(null);
@@ -78,6 +123,7 @@ export default function DailyPage({ onRefreshProgress, progressMetrics }) {
   const planWeek = getWeekForDay(planDay);
   const missionMinutes = mission?.target_minutes || 55;
   const weakSkillRows = (progressMetrics?.weak_skills || []).slice(0, 3).map(buildSkillActionRow);
+  const hasDiagnostic = (progressMetrics?.totals?.attempts || 0) > 0;
   const weekFocus =
     planWeek === 1
       ? 'Week 1 Foundation: equations, graphing, systems, and clean setup.'
@@ -147,8 +193,20 @@ export default function DailyPage({ onRefreshProgress, progressMetrics }) {
     <section className="sat-panel">
       <h2>Daily Mission Console</h2>
       <p>
-        {friendlyDate(today)} • Day {planDay} of 28 • Week {planWeek}
+        {friendlyDate(today)} &bull; Day {planDay} of 28 &bull; Week {planWeek}
       </p>
+
+      <NextStepBanner
+        hasDiagnostic={hasDiagnostic}
+        mission={mission}
+        missionQuestionCount={missionQuestionList.length}
+        summary={summary}
+        navigate={(path) => {
+          window.history.pushState(null, '', `/sat-prep${path}`);
+          window.dispatchEvent(new PopStateEvent('popstate'));
+        }}
+      />
+
       <div className="sat-alert">{weekFocus}</div>
 
       {missionOffline ? (
@@ -157,9 +215,9 @@ export default function DailyPage({ onRefreshProgress, progressMetrics }) {
         </div>
       ) : null}
 
-      <div className="sat-actions-row">
+      <div className="sat-actions-row" style={{ marginTop: 12 }}>
         <button type="button" className="sat-btn sat-btn--primary" onClick={fetchMission} disabled={busy}>
-          {busy ? 'Generating…' : 'Generate Today\'s Mission'}
+          {busy ? 'Generating\u2026' : mission ? 'Regenerate Mission' : 'Generate Today\'s Mission'}
         </button>
         {missionQuestionList.length ? (
           <button type="button" className="sat-btn" onClick={() => setRunning(true)}>
@@ -194,6 +252,17 @@ export default function DailyPage({ onRefreshProgress, progressMetrics }) {
         </div>
       ) : null}
 
+      <div className="sat-task-card" style={{ marginTop: 16, padding: 14 }}>
+        <h3>Your Daily Session Checklist</h3>
+        <ol className="sat-list">
+          <li><strong>Generate mission</strong> — press the button above to build today's plan.</li>
+          <li><strong>Start mission</strong> — work all questions. Use Enter key and A/B/C/D shortcuts.</li>
+          <li><strong>Review every miss</strong> — read the coaching feedback and correct each error.</li>
+          <li><strong>Verbal 700+</strong> — switch to Verbal page for 15-20 min of reading/writing.</li>
+          <li><strong>Check Progress</strong> — see your updated score on the Progress page.</li>
+        </ol>
+      </div>
+
       <div className="sat-grid-2" style={{ marginTop: 16 }}>
         <article className="sat-task-card">
           <h3>Foolproof Math Protocol</h3>
@@ -207,7 +276,7 @@ export default function DailyPage({ onRefreshProgress, progressMetrics }) {
         <article className="sat-task-card">
           <h3>Verbal Add-On (20 min)</h3>
           <ol className="sat-list">
-            <li>Run `/sat-prep/verbal` after math at least 5 days/week.</li>
+            <li>Run the Verbal 700+ page after math at least 5 days/week.</li>
             <li>Alternate reading and writing focus days.</li>
             <li>Keep pace under 85 sec/question with evidence-based choices.</li>
             <li>Aim for verbal 700+ while math climbs to 650-700.</li>
@@ -232,10 +301,7 @@ export default function DailyPage({ onRefreshProgress, progressMetrics }) {
       ) : null}
 
       {summary ? (
-        <div className="sat-alert sat-alert--success" style={{ marginTop: 16 }}>
-          Mission complete: {summary.correctCount}/{summary.totalCount} ({summary.accuracyPct}%),
-          attempted {summary.attemptedCount}, pace {summary.avgSeconds}s.
-        </div>
+        <SessionSummary summary={summary} onDismiss={() => setSummary(null)} />
       ) : null}
     </section>
   );

@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import SessionRunner from '../components/SessionRunner';
+import SessionSummary from '../components/SessionSummary';
 import { buildAdaptiveVerbalSet, buildVerbalSet, getVerbalStats } from '../content/verbalQuestionBank';
 import { estimateSessionFromConfig } from '../lib/sessionTime';
 
@@ -259,10 +260,7 @@ export default function VerbalPage({ progressMetrics, onRefreshProgress }) {
       ) : null}
 
       {sessionSummary ? (
-        <div className="sat-alert sat-alert--success">
-          Verbal session complete: {sessionSummary.correctCount}/{sessionSummary.totalCount} ({sessionSummary.accuracyPct}%),
-          attempted {sessionSummary.attemptedCount}, pace {sessionSummary.avgSeconds}s.
-        </div>
+        <SessionSummary summary={sessionSummary} onDismiss={() => setSessionSummary(null)} />
       ) : null}
 
       <div className="sat-grid-2" style={{ marginTop: 14 }}>

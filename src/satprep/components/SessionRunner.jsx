@@ -65,8 +65,34 @@ export default function SessionRunner({
   const [socraticStepByQuestion, setSocraticStepByQuestion] = useState({});
   const [solutionRevealedByQuestion, setSolutionRevealedByQuestion] = useState({});
 
+  const [confirmEnd, setConfirmEnd] = useState(false);
+
   const currentQuestion = questions[index] || null;
   const review = currentQuestion ? submitted[currentQuestion.id] : null;
+
+  useEffect(() => {
+    function handleKeyDown(e) {
+      if (sessionBusy || !currentQuestion) return;
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        if (review) {
+          nextQuestion();
+        } else if (currentInput !== '') {
+          submitCurrentAnswer();
+        }
+        return;
+      }
+      if (!review && currentQuestion.format === 'multiple_choice') {
+        const keyMap = { '1': '0', '2': '1', '3': '2', '4': '3', a: '0', b: '1', c: '2', d: '3' };
+        const mapped = keyMap[e.key.toLowerCase()];
+        if (mapped !== undefined && Number(mapped) < (currentQuestion.choices || []).length) {
+          setCurrentInput(mapped);
+        }
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  });
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -369,6 +395,29 @@ export default function SessionRunner({
         </div>
       </header>
 
+      {timeLimitSeconds ? (() => {
+        const expectedProgress = secondsElapsed / timeLimitSeconds;
+        const actualProgress = Object.keys(submitted).length / questions.length;
+        const paceStatus = actualProgress >= expectedProgress - 0.05 ? 'on-pace' : 'behind-pace';
+        const progressPct = Math.min(100, Math.round(actualProgress * 100));
+        const timePct = Math.min(100, Math.round(expectedProgress * 100));
+        return (
+          <div className="sat-pacing-bar">
+            <div className="sat-pacing-bar__track">
+              <div className="sat-pacing-bar__time" style={{ width: `${timePct}%` }} />
+              <div className={`sat-pacing-bar__progress sat-pacing-bar__progress--${paceStatus}`} style={{ width: `${progressPct}%` }} />
+            </div>
+            <div className="sat-pacing-bar__labels">
+              <span>{progressPct}% done</span>
+              <span className={paceStatus === 'behind-pace' ? 'is-danger' : ''}>
+                {paceStatus === 'on-pace' ? 'On pace' : 'Behind pace'} — checkpoint: {Math.round(questions.length / 2)} Q by {formatTimer(Math.round(timeLimitSeconds / 2))}
+              </span>
+              <span>{timePct}% time used</span>
+            </div>
+          </div>
+        );
+      })() : null}
+
       <article className="sat-question-card">
         <label className="sat-toggle sat-toggle--compact">
           <input
@@ -399,10 +448,16 @@ export default function SessionRunner({
           <div className="sat-choice-list">
             {displayChoices.map((choice, choiceIndex) => {
               const checked = String(currentInput) === String(choiceIndex);
+              const isCorrectChoice = review && Number(currentQuestion.answer_key) === choiceIndex;
+              const isWrongPick = review && checked && !review.isCorrect;
+              let choiceClass = 'sat-choice';
+              if (!review && checked) choiceClass += ' is-selected';
+              if (isCorrectChoice) choiceClass += ' is-correct-choice';
+              if (isWrongPick) choiceClass += ' is-wrong-choice';
               return (
                 <button
                   key={`${currentQuestion.id}-choice-${choiceIndex}`}
-                  className={`sat-choice ${checked ? 'is-selected' : ''}`}
+                  className={choiceClass}
                   type="button"
                   onClick={() => setCurrentInput(String(choiceIndex))}
                   disabled={!!review}
@@ -435,9 +490,20 @@ export default function SessionRunner({
               {index + 1 >= questions.length ? 'Finish Session' : 'Next Question'}
             </button>
           )}
-          <button className="sat-btn sat-btn--ghost" onClick={finalizeSession} type="button" disabled={sessionBusy}>
-            End Session
-          </button>
+          {!confirmEnd ? (
+            <button className="sat-btn sat-btn--ghost" onClick={() => setConfirmEnd(true)} type="button" disabled={sessionBusy}>
+              End Session
+            </button>
+          ) : (
+            <>
+              <button className="sat-btn sat-btn--ghost" style={{ borderColor: 'var(--sat-danger)', color: 'var(--sat-danger)' }} onClick={finalizeSession} type="button" disabled={sessionBusy}>
+                Confirm End ({questions.length - Object.keys(submitted).length} unanswered)
+              </button>
+              <button className="sat-btn sat-btn--ghost" onClick={() => setConfirmEnd(false)} type="button">
+                Cancel
+              </button>
+            </>
+          )}
         </div>
 
         {warning ? <div className="sat-alert">{warning}</div> : null}

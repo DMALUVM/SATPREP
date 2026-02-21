@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import SessionRunner from '../components/SessionRunner';
+import SessionSummary from '../components/SessionSummary';
 import { buildDiagnosticSet } from '../lib/selection';
 import { estimateSessionWindow } from '../lib/sessionTime';
 import { toDateKey } from '../lib/time';
@@ -66,10 +67,7 @@ export default function DiagnosticPage({ onRefreshProgress }) {
       </button>
 
       {summary ? (
-        <div className="sat-alert sat-alert--success" style={{ marginTop: 16 }}>
-          Diagnostic complete: {summary.correctCount}/{summary.totalCount} correct ({summary.accuracyPct}%),
-          avg pace {summary.avgSeconds}s.
-        </div>
+        <SessionSummary summary={summary} onDismiss={() => setSummary(null)} />
       ) : null}
     </section>
   );
