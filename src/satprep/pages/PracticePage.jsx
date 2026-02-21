@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from 'react';
+import AiStatusBadge from '../components/AiStatusBadge';
 import SessionRunner from '../components/SessionRunner';
 import SessionSummary from '../components/SessionSummary';
 import {
@@ -46,7 +47,10 @@ export default function PracticePage({ onRefreshProgress, progressMetrics }) {
 
   return (
     <section className="sat-panel">
-      <h2>Practice Builder</h2>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+        <h2 style={{ margin: 0 }}>Practice Builder</h2>
+        <AiStatusBadge />
+      </div>
       <p>Target exact weaknesses or run mixed sets when energy is high.</p>
       <p>
         Estimated session time: <strong>{estimate.label}</strong>

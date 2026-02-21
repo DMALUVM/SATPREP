@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from 'react';
+import AiStatusBadge from '../components/AiStatusBadge';
 import SessionRunner from '../components/SessionRunner';
 import SessionSummary from '../components/SessionSummary';
 import { buildAdaptiveVerbalSet, buildVerbalSet, getVerbalStats } from '../content/verbalQuestionBank';
@@ -151,7 +152,10 @@ export default function VerbalPage({ progressMetrics, onRefreshProgress }) {
 
   return (
     <section className="sat-panel">
-      <h2>Verbal 700+ Command Center</h2>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+        <h2 style={{ margin: 0 }}>Verbal 700+ Command Center</h2>
+        <AiStatusBadge />
+      </div>
       <p>
         Structured Reading + Writing coaching. Purpose: move verbal from 600 to 700+ with timed accuracy and
         decision discipline.

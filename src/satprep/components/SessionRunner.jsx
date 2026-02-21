@@ -812,37 +812,39 @@ export default function SessionRunner({
               </p>
             )}
 
-            <div className="sat-ai-tutor">
-              {aiExplanations[currentQuestion.id] ? (
-                <>
-                  <div className="sat-ai-tutor__header">
-                    <strong>AI Tutor Explanation</strong>
-                    <span className="sat-pill sat-pill--neutral">{aiExplanations[currentQuestion.id].remaining} AI uses left today</span>
-                  </div>
-                  <div className="sat-ai-tutor__body">
-                    {aiExplanations[currentQuestion.id].text}
-                  </div>
-                  <p className="sat-ai-tutor__disclaimer">
-                    AI explanations are grounded in the question data. Always verify against the step-by-step walkthrough above.
-                  </p>
-                </>
-              ) : (
-                <>
-                  <button
-                    type="button"
-                    className={`sat-btn ${review.isCorrect ? 'sat-btn--ghost' : 'sat-btn--primary'}`}
-                    onClick={requestAiExplanation}
-                    disabled={aiLoading}
-                    style={{ marginTop: 8 }}
-                  >
-                    {aiLoading ? (
-                      <><span className="sat-loader sat-loader--sm" style={{ display: 'inline-block', verticalAlign: 'middle', marginRight: 8 }} aria-hidden="true" />Thinking...</>
-                    ) : review.isCorrect ? 'AI Deep Dive' : 'Ask AI Tutor: Why is my answer wrong?'}
-                  </button>
-                  {aiError ? <div className="sat-alert sat-alert--danger" style={{ marginTop: 6 }}>{aiError}</div> : null}
-                </>
-              )}
-            </div>
+            {mode !== 'timed' && mode !== 'diagnostic' && (
+              <div className="sat-ai-tutor">
+                {aiExplanations[currentQuestion.id] ? (
+                  <>
+                    <div className="sat-ai-tutor__header">
+                      <strong>AI Tutor Explanation</strong>
+                      <span className="sat-pill sat-pill--neutral">{aiExplanations[currentQuestion.id].remaining} AI uses left today</span>
+                    </div>
+                    <div className="sat-ai-tutor__body">
+                      {aiExplanations[currentQuestion.id].text}
+                    </div>
+                    <p className="sat-ai-tutor__disclaimer">
+                      AI explanations are grounded in the question data. Always verify against the step-by-step walkthrough above.
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <button
+                      type="button"
+                      className={`sat-btn ${review.isCorrect ? 'sat-btn--ghost' : 'sat-btn--primary'}`}
+                      onClick={requestAiExplanation}
+                      disabled={aiLoading}
+                      style={{ marginTop: 8 }}
+                    >
+                      {aiLoading ? (
+                        <><span className="sat-loader sat-loader--sm" style={{ display: 'inline-block', verticalAlign: 'middle', marginRight: 8 }} aria-hidden="true" />Thinking...</>
+                      ) : review.isCorrect ? 'AI Deep Dive' : 'Ask AI Tutor: Why is my answer wrong?'}
+                    </button>
+                    {aiError ? <div className="sat-alert sat-alert--danger" style={{ marginTop: 6 }}>{aiError}</div> : null}
+                  </>
+                )}
+              </div>
+            )}
           </div>
         ) : null}
       </article>
