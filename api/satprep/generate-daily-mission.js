@@ -86,6 +86,7 @@ export default async function handler(req, res) {
         skill: q.skill,
         difficulty: q.difficulty,
         format: q.format,
+        calculator_allowed: q.calculator_allowed,
         stem: q.stem,
         choices: q.choices,
         explanation_steps: q.explanation_steps,

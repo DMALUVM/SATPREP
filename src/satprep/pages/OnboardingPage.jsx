@@ -43,6 +43,20 @@ const DIAGNOSTIC_PLAYBOOK = [
   'After finishing, start Daily Mission immediately so weak-skill targeting begins.',
 ];
 
+const DESMOS_PLAYBOOK = [
+  'Use Desmos when setup is clear and you need fast, accurate computation.',
+  'Use graph intersections for systems and equation-solving questions.',
+  'Use function input mode (for example f(3)) for function-evaluation problems.',
+  'For trig/geometry with angles, confirm degree mode first.',
+  'Use Desmos to reduce arithmetic mistakes, not to skip the setup step.',
+];
+
+const WHEN_NOT_TO_USE_DESMOS = [
+  'Do not start with Desmos if you have not translated the problem into math yet.',
+  'Do not over-graph simple arithmetic that is faster by direct calculation.',
+  'Do not trust an output unless it answers the exact thing the question asks.',
+];
+
 export default function OnboardingPage({ profile, onComplete, navigate }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -164,6 +178,17 @@ export default function OnboardingPage({ profile, onComplete, navigate }) {
             ))}
           </ul>
           <p className="sat-muted">Questions are displayed in student-friendly notation.</p>
+        </article>
+        <article className="sat-task-card">
+          <h3>Desmos Playbook</h3>
+          <ol className="sat-list">
+            {DESMOS_PLAYBOOK.map((step) => <li key={step}>{step}</li>)}
+          </ol>
+          <h3 style={{ marginTop: 10 }}>When Not To Use It</h3>
+          <ul className="sat-list">
+            {WHEN_NOT_TO_USE_DESMOS.map((step) => <li key={step}>{step}</li>)}
+          </ul>
+          <p className="sat-muted">Question review now includes a specific Desmos Method when applicable.</p>
         </article>
       </div>
 

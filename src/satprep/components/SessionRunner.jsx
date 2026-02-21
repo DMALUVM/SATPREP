@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { completeSession, submitAttempt } from '../lib/apiClient';
+import { getDesmosGuide } from '../lib/desmosGuide';
 import { estimateSessionWindow } from '../lib/sessionTime';
 import { toStudentFriendlyMathList, toStudentFriendlyMathText } from '../lib/textFormat';
 
@@ -106,6 +107,11 @@ export default function SessionRunner({
 
   const displayTrap = useMemo(
     () => toStudentFriendlyMathText(currentQuestion?.trap_tag || ''),
+    [currentQuestion]
+  );
+
+  const desmosGuide = useMemo(
+    () => getDesmosGuide(currentQuestion),
     [currentQuestion]
   );
 
@@ -364,6 +370,18 @@ export default function SessionRunner({
             <p>
               <strong>Common trap:</strong> {displayTrap}
             </p>
+            {desmosGuide ? (
+              <div className="sat-desmos-tip">
+                <p>
+                  <strong>{desmosGuide.title}:</strong> Fast calculator path for this type.
+                </p>
+                <ol>
+                  {toStudentFriendlyMathList(desmosGuide.steps || []).map((step) => (
+                    <li key={`${currentQuestion.id}-desmos-${step.slice(0, 16)}`}>{step}</li>
+                  ))}
+                </ol>
+              </div>
+            ) : null}
           </div>
         ) : null}
       </article>

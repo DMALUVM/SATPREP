@@ -453,6 +453,18 @@
   margin-bottom: 8px;
 }
 
+.sat-desmos-tip {
+  margin-top: 10px;
+  padding: 10px;
+  border: 1px solid rgba(10, 127, 116, 0.25);
+  border-radius: 10px;
+  background: rgba(10, 127, 116, 0.06);
+}
+
+.sat-desmos-tip p {
+  margin: 0 0 6px;
+}
+
 .sat-table-wrap {
   overflow: auto;
 }
