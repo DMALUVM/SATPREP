@@ -6,7 +6,8 @@ import SessionSummary from '../components/SessionSummary';
 import { generateDailyMission } from '../lib/apiClient';
 import { getQuestionById } from '../lib/selection';
 import { getDueReviewIds, getReviewStats } from '../lib/spacedRepetition';
-import { friendlyDate, getPhaseForDay, getPlanDay, SAT_PLAN_TOTAL_DAYS, SAT_TEST_DATE, toDateKey } from '../lib/time';
+import { getSupabaseBrowserClient } from '../lib/supabaseBrowser';
+import { friendlyDate, getPhaseForDay, getPlanDay, SAT_PLAN_TOTAL_DAYS, SAT_TEST_DATE, setPlanDates, toDateKey } from '../lib/time';
 
 const COACH_PLAYBOOK = {
   'linear-equations': [
@@ -148,6 +149,70 @@ function DailyProjection() {
   );
 }
 
+function TestDateEditor({ profile, onUpdateProfile }) {
+  const currentTestDate = profile?.sat_test_date || profile?.settings?.sat_test_date || SAT_TEST_DATE;
+  const [editing, setEditing] = useState(false);
+  const [dateValue, setDateValue] = useState(currentTestDate);
+  const [saving, setSaving] = useState(false);
+
+  async function saveTestDate() {
+    if (!dateValue || dateValue === currentTestDate) {
+      setEditing(false);
+      return;
+    }
+    setSaving(true);
+    try {
+      const supabase = getSupabaseBrowserClient();
+      const settings = { ...(profile?.settings || {}), sat_test_date: dateValue };
+      const { data, error } = await supabase
+        .from('sat_profiles')
+        .update({ sat_test_date: dateValue, settings, updated_at: new Date().toISOString() })
+        .eq('user_id', profile.user_id)
+        .select('*')
+        .single();
+      if (error) throw error;
+      setPlanDates(data.sat_start_date, dateValue);
+      onUpdateProfile?.(data);
+      setEditing(false);
+    } catch {
+      // silent — keep editor open
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  if (!editing) {
+    return (
+      <button
+        type="button"
+        className="sat-btn sat-btn--ghost"
+        style={{ fontSize: 13, padding: '4px 10px' }}
+        onClick={() => setEditing(true)}
+      >
+        Change test date
+      </button>
+    );
+  }
+
+  return (
+    <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+      <input
+        type="date"
+        value={dateValue}
+        onChange={(e) => setDateValue(e.target.value)}
+        min={toDateKey()}
+        style={{ fontSize: 14, padding: '4px 8px' }}
+      />
+      <button type="button" className="sat-btn sat-btn--primary" style={{ fontSize: 13, padding: '4px 10px' }} onClick={saveTestDate} disabled={saving}>
+        {saving ? 'Saving…' : 'Save'}
+      </button>
+      <button type="button" className="sat-btn sat-btn--ghost" style={{ fontSize: 13, padding: '4px 10px' }} onClick={() => setEditing(false)}>
+        Cancel
+      </button>
+    </div>
+  );
+}
+
 function SpacedReviewBanner({ today, onStartReview }) {
   const dueIds = useMemo(() => getDueReviewIds(today), [today]);
   const stats = useMemo(() => getReviewStats(), []);
@@ -173,7 +238,7 @@ function SpacedReviewBanner({ today, onStartReview }) {
   );
 }
 
-export default function DailyPage({ onRefreshProgress, progressMetrics, navigate }) {
+export default function DailyPage({ onRefreshProgress, progressMetrics, navigate, profile, onUpdateProfile }) {
   const [mission, setMission] = useState(null);
   const [missionMeta, setMissionMeta] = useState(null);
   const [missionQuestions, setMissionQuestions] = useState([]);
@@ -282,9 +347,12 @@ export default function DailyPage({ onRefreshProgress, progressMetrics, navigate
         <h2 style={{ margin: 0 }}>Daily Mission Console</h2>
         <AiStatusBadge />
       </div>
-      <p>
-        {friendlyDate(today)} {'\u2022'} Day {planDay} of {SAT_PLAN_TOTAL_DAYS} {'\u2022'} {daysLeft} day{daysLeft !== 1 ? 's' : ''} to test ({friendlyDate(SAT_TEST_DATE)})
-      </p>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+        <p style={{ margin: 0 }}>
+          {friendlyDate(today)} {'\u2022'} Day {planDay} of {SAT_PLAN_TOTAL_DAYS} {'\u2022'} {daysLeft} day{daysLeft !== 1 ? 's' : ''} to test ({friendlyDate(SAT_TEST_DATE)})
+        </p>
+        {profile ? <TestDateEditor profile={profile} onUpdateProfile={onUpdateProfile} /> : null}
+      </div>
 
       <SpacedReviewBanner today={today} onStartReview={(ids) => {
         const reviewSet = ids.map(getQuestionById).filter(Boolean);
