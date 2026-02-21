@@ -1,15 +1,41 @@
 import React, { useMemo, useState } from 'react';
 import SessionRunner from '../components/SessionRunner';
 import SessionSummary from '../components/SessionSummary';
-import { buildDiagnosticSet } from '../lib/selection';
+import { buildDiagnosticSet, getQuestionById } from '../lib/selection';
 import { estimateSessionWindow } from '../lib/sessionTime';
 import { toDateKey } from '../lib/time';
 
 export default function DiagnosticPage({ onRefreshProgress }) {
   const [started, setStarted] = useState(false);
   const [summary, setSummary] = useState(null);
+  const [reviewQuestions, setReviewQuestions] = useState(null);
   const questions = useMemo(() => buildDiagnosticSet(), []);
   const estimate = useMemo(() => estimateSessionWindow({ questions }), [questions]);
+
+  function handleReviewMistakes(missedIds) {
+    const reviewSet = missedIds.map(getQuestionById).filter(Boolean);
+    if (reviewSet.length) {
+      setSummary(null);
+      setReviewQuestions(reviewSet);
+    }
+  }
+
+  if (reviewQuestions) {
+    return (
+      <SessionRunner
+        title={`Review ${reviewQuestions.length} Missed Question${reviewQuestions.length !== 1 ? 's' : ''}`}
+        mode="review"
+        questions={reviewQuestions}
+        planDate={toDateKey()}
+        onExit={() => setReviewQuestions(null)}
+        onFinish={(result) => {
+          setReviewQuestions(null);
+          setSummary(result);
+          onRefreshProgress?.();
+        }}
+      />
+    );
+  }
 
   if (started) {
     return (
@@ -67,7 +93,7 @@ export default function DiagnosticPage({ onRefreshProgress }) {
       </button>
 
       {summary ? (
-        <SessionSummary summary={summary} onDismiss={() => setSummary(null)} />
+        <SessionSummary summary={summary} onDismiss={() => setSummary(null)} onReviewMistakes={handleReviewMistakes} />
       ) : null}
     </section>
   );

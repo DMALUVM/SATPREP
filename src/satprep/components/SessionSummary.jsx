@@ -4,7 +4,7 @@ function formatSkill(skill) {
   return String(skill || '').replace(/-/g, ' ');
 }
 
-export default function SessionSummary({ summary, onDismiss }) {
+export default function SessionSummary({ summary, onDismiss, onReviewMistakes }) {
   if (!summary) return null;
 
   const {
@@ -17,6 +17,7 @@ export default function SessionSummary({ summary, onDismiss }) {
     mode = '',
     skillBreakdown = {},
     domainBreakdown = {},
+    missedQuestionIds = [],
   } = summary;
 
   const skillEntries = Object.entries(skillBreakdown)
@@ -147,11 +148,22 @@ export default function SessionSummary({ summary, onDismiss }) {
         </div>
       ) : null}
 
-      {onDismiss ? (
-        <button type="button" className="sat-btn sat-btn--primary" onClick={onDismiss} style={{ marginTop: 14 }}>
-          Done
-        </button>
-      ) : null}
+      <div className="sat-actions-row" style={{ marginTop: 14 }}>
+        {missedQuestionIds.length > 0 && onReviewMistakes ? (
+          <button
+            type="button"
+            className="sat-btn sat-btn--primary"
+            onClick={() => onReviewMistakes(missedQuestionIds)}
+          >
+            Review {missedQuestionIds.length} Mistake{missedQuestionIds.length !== 1 ? 's' : ''} with AI Tutor
+          </button>
+        ) : null}
+        {onDismiss ? (
+          <button type="button" className={missedQuestionIds.length > 0 && onReviewMistakes ? 'sat-btn' : 'sat-btn sat-btn--primary'} onClick={onDismiss}>
+            Done
+          </button>
+        ) : null}
+      </div>
     </div>
   );
 }

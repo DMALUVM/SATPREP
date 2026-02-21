@@ -119,6 +119,7 @@ export default function DailyPage({ onRefreshProgress, progressMetrics, navigate
   const [error, setError] = useState('');
   const [summary, setSummary] = useState(null);
   const [running, setRunning] = useState(false);
+  const [reviewQuestions, setReviewQuestions] = useState(null);
 
   const today = toDateKey();
   const planDay = getPlanDay(today);
@@ -164,6 +165,31 @@ export default function DailyPage({ onRefreshProgress, progressMetrics, navigate
     } finally {
       setBusy(false);
     }
+  }
+
+  function handleReviewMistakes(missedIds) {
+    const reviewSet = missedIds.map(getQuestionById).filter(Boolean);
+    if (reviewSet.length) {
+      setSummary(null);
+      setReviewQuestions(reviewSet);
+    }
+  }
+
+  if (reviewQuestions) {
+    return (
+      <SessionRunner
+        title={`Review ${reviewQuestions.length} Missed Question${reviewQuestions.length !== 1 ? 's' : ''}`}
+        mode="review"
+        questions={reviewQuestions}
+        planDate={today}
+        onExit={() => setReviewQuestions(null)}
+        onFinish={(result) => {
+          setReviewQuestions(null);
+          setSummary(result);
+          onRefreshProgress?.();
+        }}
+      />
+    );
   }
 
   if (running && missionQuestionList.length) {
@@ -303,7 +329,7 @@ export default function DailyPage({ onRefreshProgress, progressMetrics, navigate
       ) : null}
 
       {summary ? (
-        <SessionSummary summary={summary} onDismiss={() => setSummary(null)} />
+        <SessionSummary summary={summary} onDismiss={() => setSummary(null)} onReviewMistakes={handleReviewMistakes} />
       ) : null}
 
       <MistakeJournal />

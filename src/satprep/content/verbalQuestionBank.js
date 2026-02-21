@@ -813,6 +813,10 @@ export const VERBAL_QUESTION_BANK = TEMPLATE_PLAN.flatMap(([key, count, factory]
   return set;
 });
 
+export function getVerbalQuestionById(id) {
+  return VERBAL_QUESTION_BANK.find((q) => q.id === id) || null;
+}
+
 export function getVerbalStats() {
   const bySkill = {};
   VERBAL_QUESTION_BANK.forEach((q) => {

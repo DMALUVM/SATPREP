@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import SessionRunner from '../components/SessionRunner';
 import SessionSummary from '../components/SessionSummary';
-import { buildTimedSet } from '../lib/selection';
+import { buildTimedSet, getQuestionById } from '../lib/selection';
 import { toDateKey } from '../lib/time';
 
 const FULL_SECTION_TIME = 70 * 60;
@@ -9,7 +9,33 @@ const FULL_SECTION_TIME = 70 * 60;
 export default function TimedPage({ onRefreshProgress }) {
   const [started, setStarted] = useState(false);
   const [summary, setSummary] = useState(null);
+  const [reviewQuestions, setReviewQuestions] = useState(null);
   const questions = useMemo(() => buildTimedSet(44), [started]);
+
+  function handleReviewMistakes(missedIds) {
+    const reviewSet = missedIds.map(getQuestionById).filter(Boolean);
+    if (reviewSet.length) {
+      setSummary(null);
+      setReviewQuestions(reviewSet);
+    }
+  }
+
+  if (reviewQuestions) {
+    return (
+      <SessionRunner
+        title={`Review ${reviewQuestions.length} Missed Question${reviewQuestions.length !== 1 ? 's' : ''}`}
+        mode="review"
+        questions={reviewQuestions}
+        planDate={toDateKey()}
+        onExit={() => setReviewQuestions(null)}
+        onFinish={(result) => {
+          setReviewQuestions(null);
+          setSummary(result);
+          onRefreshProgress?.();
+        }}
+      />
+    );
+  }
 
   if (started) {
     return (
@@ -46,7 +72,7 @@ export default function TimedPage({ onRefreshProgress }) {
         Start Timed Simulation
       </button>
       {summary ? (
-        <SessionSummary summary={summary} onDismiss={() => setSummary(null)} />
+        <SessionSummary summary={summary} onDismiss={() => setSummary(null)} onReviewMistakes={handleReviewMistakes} />
       ) : null}
     </section>
   );

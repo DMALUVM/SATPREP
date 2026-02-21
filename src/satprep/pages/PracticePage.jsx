@@ -5,6 +5,7 @@ import SessionSummary from '../components/SessionSummary';
 import {
   buildAdaptivePracticeSet,
   buildPracticeSet,
+  getQuestionById,
   listDomains,
   listSkills,
 } from '../lib/selection';
@@ -20,6 +21,7 @@ export default function PracticePage({ onRefreshProgress, progressMetrics }) {
   const [sessionQuestions, setSessionQuestions] = useState(null);
   const [sessionSummary, setSessionSummary] = useState(null);
   const [useAdaptive, setUseAdaptive] = useState(true);
+  const [reviewQuestions, setReviewQuestions] = useState(null);
 
   const skills = useMemo(() => ['all', ...listSkills(domain)], [domain]);
   const weakSkills = (progressMetrics?.weak_skills || []).map((row) => row.skill).filter(Boolean);
@@ -27,6 +29,31 @@ export default function PracticePage({ onRefreshProgress, progressMetrics }) {
     () => estimateSessionFromConfig({ count, difficulty, section: 'math' }),
     [count, difficulty]
   );
+
+  function handleReviewMistakes(missedIds) {
+    const reviewSet = missedIds.map(getQuestionById).filter(Boolean);
+    if (reviewSet.length) {
+      setSessionSummary(null);
+      setReviewQuestions(reviewSet);
+    }
+  }
+
+  if (reviewQuestions) {
+    return (
+      <SessionRunner
+        title={`Review ${reviewQuestions.length} Missed Question${reviewQuestions.length !== 1 ? 's' : ''}`}
+        mode="review"
+        questions={reviewQuestions}
+        planDate={toDateKey()}
+        onExit={() => setReviewQuestions(null)}
+        onFinish={(result) => {
+          setReviewQuestions(null);
+          setSessionSummary(result);
+          onRefreshProgress?.();
+        }}
+      />
+    );
+  }
 
   if (sessionQuestions) {
     return (
@@ -127,7 +154,7 @@ export default function PracticePage({ onRefreshProgress, progressMetrics }) {
       </button>
 
       {sessionSummary ? (
-        <SessionSummary summary={sessionSummary} onDismiss={() => setSessionSummary(null)} />
+        <SessionSummary summary={sessionSummary} onDismiss={() => setSessionSummary(null)} onReviewMistakes={handleReviewMistakes} />
       ) : null}
     </section>
   );

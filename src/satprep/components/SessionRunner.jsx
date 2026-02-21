@@ -477,6 +477,24 @@ export default function SessionRunner({
 
     setSessionBusy(false);
 
+    const missedQuestions = submittedEntries
+      .filter(([, value]) => !value.isCorrect)
+      .map(([questionId, value]) => {
+        const q = questions.find((qItem) => qItem.id === questionId);
+        if (!q) return null;
+        return {
+          id: q.id,
+          skill: q.skill,
+          domain: q.domain,
+          difficulty: q.difficulty,
+          stem: String(q.stem || '').slice(0, 200),
+          studentAnswer: value.answer,
+          correctAnswer: q.answer_key,
+          secondsSpent: value.secondsSpent,
+        };
+      })
+      .filter(Boolean);
+
     const sessionResult = {
       totalCount,
       attemptedCount,
@@ -487,26 +505,10 @@ export default function SessionRunner({
       mode,
       skillBreakdown,
       domainBreakdown,
+      missedQuestionIds: missedQuestions.map((q) => q.id),
     };
 
     try {
-      const missedQuestions = submittedEntries
-        .filter(([, value]) => !value.isCorrect)
-        .map(([questionId, value]) => {
-          const q = questions.find((qItem) => qItem.id === questionId);
-          if (!q) return null;
-          return {
-            id: q.id,
-            skill: q.skill,
-            domain: q.domain,
-            difficulty: q.difficulty,
-            stem: String(q.stem || '').slice(0, 200),
-            studentAnswer: value.answer,
-            correctAnswer: q.answer_key,
-            secondsSpent: value.secondsSpent,
-          };
-        })
-        .filter(Boolean);
 
       const historyEntry = {
         id: Date.now(),

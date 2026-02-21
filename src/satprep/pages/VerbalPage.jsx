@@ -2,7 +2,7 @@ import React, { useMemo, useState } from 'react';
 import AiStatusBadge from '../components/AiStatusBadge';
 import SessionRunner from '../components/SessionRunner';
 import SessionSummary from '../components/SessionSummary';
-import { buildAdaptiveVerbalSet, buildVerbalSet, getVerbalStats } from '../content/verbalQuestionBank';
+import { buildAdaptiveVerbalSet, buildVerbalSet, getVerbalQuestionById, getVerbalStats } from '../content/verbalQuestionBank';
 import { estimateSessionFromConfig } from '../lib/sessionTime';
 
 const STRATEGY_PLAYBOOK = [
@@ -106,6 +106,7 @@ export default function VerbalPage({ progressMetrics, onRefreshProgress }) {
   const [runningSet, setRunningSet] = useState(null);
   const [sessionSummary, setSessionSummary] = useState(null);
   const [useAdaptive, setUseAdaptive] = useState(true);
+  const [reviewQuestions, setReviewQuestions] = useState(null);
 
   const stats = useMemo(() => getVerbalStats(), []);
   const metrics = progressMetrics?.verbal || buildDefaultVerbalMetrics();
@@ -131,6 +132,31 @@ export default function VerbalPage({ progressMetrics, onRefreshProgress }) {
     const perQuestion = section === 'verbal-writing' ? 75 : 85;
     return count * perQuestion;
   }, [section, count]);
+
+  function handleReviewMistakes(missedIds) {
+    const reviewSet = missedIds.map(getVerbalQuestionById).filter(Boolean);
+    if (reviewSet.length) {
+      setSessionSummary(null);
+      setReviewQuestions(reviewSet);
+    }
+  }
+
+  if (reviewQuestions) {
+    return (
+      <SessionRunner
+        title={`Review ${reviewQuestions.length} Missed Question${reviewQuestions.length !== 1 ? 's' : ''}`}
+        mode="review"
+        questions={reviewQuestions}
+        coachTone="firm-supportive"
+        onExit={() => setReviewQuestions(null)}
+        onFinish={(result) => {
+          setReviewQuestions(null);
+          setSessionSummary(result);
+          onRefreshProgress?.();
+        }}
+      />
+    );
+  }
 
   if (runningSet) {
     return (
@@ -276,7 +302,7 @@ export default function VerbalPage({ progressMetrics, onRefreshProgress }) {
       ) : null}
 
       {sessionSummary ? (
-        <SessionSummary summary={sessionSummary} onDismiss={() => setSessionSummary(null)} />
+        <SessionSummary summary={sessionSummary} onDismiss={() => setSessionSummary(null)} onReviewMistakes={handleReviewMistakes} />
       ) : null}
 
       <div className="sat-grid-2" style={{ marginTop: 14 }}>
