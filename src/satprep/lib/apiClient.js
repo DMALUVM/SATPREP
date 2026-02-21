@@ -29,8 +29,19 @@ function writeStorage(key, value) {
   if (typeof window === 'undefined') return;
   try {
     window.localStorage.setItem(key, JSON.stringify(value));
-  } catch {
-    // ignore quota/storage errors
+  } catch (e) {
+    if (e?.name === 'QuotaExceededError') {
+      // Clear caches (not queues!) to free space, then retry once
+      try {
+        window.localStorage.removeItem(STORAGE.PROGRESS_CACHE);
+        window.localStorage.removeItem(STORAGE.PARENT_CACHE);
+        window.localStorage.removeItem(STORAGE.DAILY_MISSION_CACHE);
+        window.localStorage.setItem(key, JSON.stringify(value));
+      } catch {
+        // eslint-disable-next-line no-console
+        console.warn('localStorage quota exceeded even after clearing caches');
+      }
+    }
   }
 }
 
@@ -155,26 +166,41 @@ function buildOfflineMission(planDate) {
   };
 }
 
+const DEFAULT_TIMEOUT_MS = 15000;
+
 async function satFetchRaw(path, options = {}, tokenOverride = null) {
   const token = tokenOverride || await getSatAccessToken();
   if (!token) throw new Error('You are not signed in.');
 
-  const response = await fetch(path, {
-    ...options,
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${token}`,
-      ...(options.headers || {}),
-    },
-  });
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), DEFAULT_TIMEOUT_MS);
 
-  const json = await response.json().catch(() => ({}));
-  if (!response.ok) {
-    const error = new Error(json.error || `Request failed (${response.status})`);
-    error.status = response.status;
-    throw error;
+  try {
+    const response = await fetch(path, {
+      ...options,
+      signal: controller.signal,
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+        ...(options.headers || {}),
+      },
+    });
+
+    const json = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      const error = new Error(json.error || `Request failed (${response.status})`);
+      error.status = response.status;
+      throw error;
+    }
+    return json;
+  } catch (err) {
+    if (err.name === 'AbortError') {
+      throw new Error('Request timed out. Check your internet connection and try again.');
+    }
+    throw err;
+  } finally {
+    clearTimeout(timeoutId);
   }
-  return json;
 }
 
 async function satFetch(path, options = {}) {

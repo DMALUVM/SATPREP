@@ -4,6 +4,7 @@ import NavBar from './components/NavBar';
 import { useSatRoute } from './hooks/useSatRoute';
 import { fetchProgress, getOfflineSyncSnapshot, subscribeOfflineSync } from './lib/apiClient';
 import { getSupabaseBrowserClient } from './lib/supabaseBrowser';
+import { setPlanDates } from './lib/time';
 import AuthPage from './pages/AuthPage';
 import DailyPage from './pages/DailyPage';
 import DiagnosticPage from './pages/DiagnosticPage';
@@ -93,6 +94,7 @@ export default function SatPrepApp() {
         setProfile(null);
         return;
       }
+      if (data?.sat_start_date) setPlanDates(data.sat_start_date);
       setProfile(data || null);
     }
 

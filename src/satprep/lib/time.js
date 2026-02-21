@@ -1,8 +1,23 @@
-export const SAT_PLAN_START_DATE = '2026-02-22';
-export const SAT_PLAN_END_DATE = '2026-03-21';
+// Default dates — overridden per-user via profile.sat_start_date
+export let SAT_PLAN_START_DATE = '2026-02-22';
+export let SAT_PLAN_END_DATE = '2026-03-21';
+
+export function setPlanDates(startDate) {
+  if (!startDate) return;
+  SAT_PLAN_START_DATE = startDate;
+  // 28-day plan
+  const start = new Date(`${startDate}T00:00:00`);
+  start.setDate(start.getDate() + 27);
+  SAT_PLAN_END_DATE = toDateKey(start);
+}
 
 export function toDateKey(value = new Date()) {
-  return new Date(value).toISOString().slice(0, 10);
+  // Use local time so "today" matches the student's actual day, not UTC
+  const d = new Date(value);
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
 }
 
 export function diffDays(from, to) {

@@ -35,7 +35,7 @@ export default async function handler(req, res) {
 
     const questionId = req.body?.question_id;
     const sessionMode = req.body?.session_mode || 'practice';
-    const secondsSpent = Math.max(1, Number(req.body?.seconds_spent || 0));
+    const secondsSpent = Math.min(600, Math.max(1, Number(req.body?.seconds_spent || 0)));
     const sessionId = req.body?.session_id || null;
     const rawAnswer = req.body?.response_payload?.answer ?? null;
 
