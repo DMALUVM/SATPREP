@@ -41,8 +41,9 @@ export default function SessionSummary({ summary, onDismiss }) {
   const strongSkills = skillEntries.filter((s) => s.accuracy >= 80).slice(-3).reverse();
 
   const elapsedMin = Math.round(elapsedSeconds / 60);
-  const isMathPace = avgSeconds <= 95;
-  const isVerbalPace = avgSeconds <= 85;
+  const isVerbal = mode === 'verbal' || mode === 'verbal-reading' || mode === 'verbal-writing';
+  const paceTarget = isVerbal ? 85 : 95;
+  const isOnPace = avgSeconds <= paceTarget;
 
   return (
     <div className="sat-session-summary">
@@ -57,7 +58,7 @@ export default function SessionSummary({ summary, onDismiss }) {
         <article className="sat-stat">
           <div className="sat-stat__label">Pace</div>
           <div className="sat-stat__value">{avgSeconds}s</div>
-          <div className="sat-stat__detail">{isMathPace ? 'On target' : 'Above 95s target'}</div>
+          <div className="sat-stat__detail">{isOnPace ? 'On target' : `Above ${paceTarget}s target`}</div>
         </article>
         <article className="sat-stat">
           <div className="sat-stat__label">Time</div>

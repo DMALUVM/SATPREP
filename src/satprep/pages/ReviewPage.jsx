@@ -71,9 +71,9 @@ export default function ReviewPage({ progressMetrics, onRefreshProgress }) {
               {weakSkills.map((skill) => (
                 <tr key={skill.skill}>
                   <td>{skill.skill}</td>
-                  <td>{skill.mastery_score.toFixed(1)}</td>
-                  <td>{skill.confidence.toFixed(1)}</td>
-                  <td>{skill.total_attempts}</td>
+                  <td>{Number(skill.mastery_score || 0).toFixed(1)}</td>
+                  <td>{Number(skill.confidence || 0).toFixed(1)}</td>
+                  <td>{skill.total_attempts || 0}</td>
                 </tr>
               ))}
             </tbody>
