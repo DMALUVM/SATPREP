@@ -418,6 +418,17 @@ export async function fetchAiExplanation(payload) {
   });
 }
 
+export async function fetchAiFollowUp(payload) {
+  if (typeof navigator !== 'undefined' && !navigator.onLine) {
+    throw new Error('AI tutor requires internet connection.');
+  }
+
+  return satFetch('/api/satprep/ai-explain', {
+    method: 'POST',
+    body: JSON.stringify({ ...payload, follow_up: true }),
+  });
+}
+
 export async function exportWeeklyReport(payload = {}) {
   if (typeof navigator !== 'undefined' && !navigator.onLine) {
     throw new Error('Weekly report export requires internet connection.');

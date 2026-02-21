@@ -1,8 +1,9 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { completeSession, fetchAiExplanation, submitAttempt } from '../lib/apiClient';
+import { completeSession, fetchAiExplanation, fetchAiFollowUp, submitAttempt } from '../lib/apiClient';
 import { buildCoachingPlan } from '../lib/coaching';
 import { getDesmosGuide } from '../lib/desmosGuide';
 import { estimateSessionWindow } from '../lib/sessionTime';
+import { recordMisses, recordCorrectReview, recordWrongReview } from '../lib/spacedRepetition';
 import MathText from './MathText';
 
 const SESSION_SAVE_KEY = 'satprep.activeSession.v1';
@@ -105,6 +106,8 @@ export default function SessionRunner({
   const [eliminated, setEliminated] = useState(() => resumeOffer?.eliminated || {});
   const [showNav, setShowNav] = useState(false);
   const [aiExplanations, setAiExplanations] = useState({});
+  const [aiConversations, setAiConversations] = useState({});
+  const [aiFollowUpInput, setAiFollowUpInput] = useState('');
   const [aiLoading, setAiLoading] = useState(false);
   const [aiError, setAiError] = useState('');
   const [sessionFinalized, setSessionFinalized] = useState(false);
@@ -322,6 +325,44 @@ export default function SessionRunner({
     }
   }
 
+  async function sendAiFollowUp() {
+    if (!currentQuestion || !aiFollowUpInput.trim() || aiLoading) return;
+    const questionId = currentQuestion.id;
+    const initialExplanation = aiExplanations[questionId]?.text || '';
+    const prevMessages = aiConversations[questionId] || [];
+
+    setAiLoading(true);
+    setAiError('');
+    try {
+      const isVerbal = mode === 'verbal' || mode === 'verbal-reading' || mode === 'verbal-writing';
+      const result = await fetchAiFollowUp({
+        stem: String(currentQuestion.stem || '').slice(0, 1000),
+        choices: currentQuestion.choices || [],
+        student_answer: submitted[questionId]?.answer,
+        correct_answer: currentQuestion.answer_key,
+        skill: currentQuestion.skill,
+        domain: currentQuestion.domain,
+        section: isVerbal ? 'verbal' : 'math',
+        initial_explanation: initialExplanation,
+        conversation: [...prevMessages, { role: 'user', content: aiFollowUpInput.trim() }],
+      });
+
+      setAiConversations((prev) => ({
+        ...prev,
+        [questionId]: [
+          ...(prev[questionId] || []),
+          { role: 'user', content: aiFollowUpInput.trim() },
+          { role: 'tutor', content: result.explanation },
+        ],
+      }));
+      setAiFollowUpInput('');
+    } catch (err) {
+      setAiError(err.message || 'Follow-up failed.');
+    } finally {
+      setAiLoading(false);
+    }
+  }
+
   async function submitCurrentAnswer() {
     if (!currentQuestion || sessionBusy || sessionFinalized) return;
 
@@ -372,6 +413,15 @@ export default function SessionRunner({
         answer: rawAnswer,
       },
     }));
+
+    // Spaced repetition: track review outcomes
+    if (mode === 'review') {
+      if (resolvedCorrect) {
+        recordCorrectReview(currentQuestion.id);
+      } else {
+        recordWrongReview(currentQuestion.id);
+      }
+    }
 
     setSocraticStepByQuestion((prev) => ({
       ...prev,
@@ -507,6 +557,11 @@ export default function SessionRunner({
       }));
 
     const missedQuestions = [...wrongQuestions, ...unansweredQuestions];
+
+    // Spaced repetition: schedule missed questions for future review
+    if (missedQuestions.length) {
+      recordMisses(missedQuestions);
+    }
 
     const sessionResult = {
       totalCount,
@@ -847,6 +902,42 @@ export default function SessionRunner({
                     <div className="sat-ai-tutor__body">
                       {aiExplanations[currentQuestion.id].text}
                     </div>
+
+                    {(aiConversations[currentQuestion.id] || []).map((msg, i) => (
+                      <div
+                        key={`${currentQuestion.id}-ai-msg-${i}`}
+                        className={msg.role === 'user' ? 'sat-ai-tutor__user-msg' : 'sat-ai-tutor__body'}
+                        style={{ marginTop: 8 }}
+                      >
+                        {msg.role === 'user' ? (
+                          <><strong>You:</strong> {msg.content}</>
+                        ) : (
+                          msg.content
+                        )}
+                      </div>
+                    ))}
+
+                    <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
+                      <input
+                        type="text"
+                        className="sat-ai-tutor__followup-input"
+                        placeholder="I still don't understand..."
+                        value={aiFollowUpInput}
+                        onChange={(e) => setAiFollowUpInput(e.target.value)}
+                        onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); sendAiFollowUp(); } }}
+                        disabled={aiLoading}
+                        style={{ flex: 1, border: '1px solid var(--sat-line)', borderRadius: 10, padding: '8px 12px', font: 'inherit', fontSize: 14 }}
+                      />
+                      <button
+                        type="button"
+                        className="sat-btn sat-btn--primary"
+                        onClick={sendAiFollowUp}
+                        disabled={aiLoading || !aiFollowUpInput.trim()}
+                      >
+                        {aiLoading ? 'Thinking...' : 'Ask'}
+                      </button>
+                    </div>
+
                     <p className="sat-ai-tutor__disclaimer">
                       AI explanations are grounded in the question data. Always verify against the step-by-step walkthrough above.
                     </p>

@@ -1328,6 +1328,21 @@
   white-space: pre-wrap;
 }
 
+.sat-ai-tutor__user-msg {
+  background: rgba(239, 91, 42, 0.06);
+  border-left: 3px solid var(--sat-accent);
+  padding: 10px 14px;
+  border-radius: 0 8px 8px 0;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.sat-ai-tutor__followup-input:focus {
+  border-color: var(--sat-primary) !important;
+  box-shadow: 0 0 0 3px rgba(10, 127, 116, 0.12);
+  outline: none;
+}
+
 .sat-ai-tutor__disclaimer {
   margin-top: 8px;
   font-size: 12px;

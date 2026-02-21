@@ -1,10 +1,146 @@
 import React, { useMemo, useState } from 'react';
 import StatCard from '../components/StatCard';
+import { getReviewStats } from '../lib/spacedRepetition';
+import { SAT_PLAN_END_DATE, SAT_PLAN_WEEKS, getPlanDay, toDateKey } from '../lib/time';
 
 function combinedScoreTone(score) {
   if (score >= 1300) return 'success';
   if (score >= 1200) return 'primary';
   return 'default';
+}
+
+function ScoreProjection({ metrics }) {
+  const projection = useMemo(() => {
+    try {
+      const raw = window.localStorage.getItem('satprep.sessionHistory.v1');
+      const history = raw ? JSON.parse(raw) : [];
+      if (history.length < 2) return null;
+
+      const today = toDateKey();
+      const planDay = getPlanDay(today);
+      const totalPlanDays = SAT_PLAN_WEEKS * 7;
+      const daysRemaining = Math.max(0, totalPlanDays - planDay);
+
+      // Group sessions by date and compute daily accuracy
+      const byDate = {};
+      history.forEach((s) => {
+        const dateKey = s.date ? s.date.slice(0, 10) : null;
+        if (!dateKey) return;
+        if (!byDate[dateKey]) byDate[dateKey] = { correct: 0, total: 0 };
+        byDate[dateKey].correct += (s.correctCount || 0);
+        byDate[dateKey].total += (s.totalCount || 0);
+      });
+
+      const dailyAccuracies = Object.entries(byDate)
+        .filter(([, d]) => d.total >= 3)
+        .sort(([a], [b]) => a.localeCompare(b))
+        .map(([date, d], i) => ({
+          day: i,
+          accuracy: d.total ? d.correct / d.total : 0,
+        }));
+
+      if (dailyAccuracies.length < 2) return null;
+
+      // Linear regression on accuracy trend
+      const n = dailyAccuracies.length;
+      const sumX = dailyAccuracies.reduce((s, d) => s + d.day, 0);
+      const sumY = dailyAccuracies.reduce((s, d) => s + d.accuracy, 0);
+      const sumXY = dailyAccuracies.reduce((s, d) => s + d.day * d.accuracy, 0);
+      const sumX2 = dailyAccuracies.reduce((s, d) => s + d.day * d.day, 0);
+      const slope = (n * sumXY - sumX * sumY) / (n * sumX2 - sumX * sumX);
+      const intercept = (sumY - slope * sumX) / n;
+
+      const currentAccuracy = dailyAccuracies[n - 1].accuracy;
+      const projectedAccuracy = Math.min(1, Math.max(0, intercept + slope * (n + daysRemaining)));
+
+      // Convert accuracy to approximate SAT score (rough linear mapping)
+      // SAT math: ~40% accuracy ≈ 450, ~70% ≈ 600, ~90% ≈ 750
+      function accuracyToScore(acc) {
+        return Math.round(200 + acc * 600);
+      }
+
+      const currentMathScore = metrics.totals?.predicted_math_score || accuracyToScore(currentAccuracy);
+      const currentVerbalScore = metrics.verbal?.predicted_verbal_score || 0;
+      const currentCombined = currentMathScore + currentVerbalScore;
+
+      const projectedMathScore = accuracyToScore(projectedAccuracy);
+      const projectedCombined = projectedMathScore + currentVerbalScore;
+
+      const improving = slope > 0.001;
+      const declining = slope < -0.005;
+      const totalSessions = history.length;
+
+      const reviewStats = getReviewStats();
+
+      return {
+        daysRemaining,
+        testDate: SAT_PLAN_END_DATE,
+        currentCombined,
+        projectedCombined,
+        currentMathScore,
+        projectedMathScore,
+        currentVerbalScore,
+        improving,
+        declining,
+        slope,
+        totalSessions,
+        reviewStats,
+      };
+    } catch {
+      return null;
+    }
+  }, [metrics]);
+
+  if (!projection) return null;
+
+  const { daysRemaining, currentCombined, projectedCombined, improving, declining, totalSessions, reviewStats } = projection;
+  const onTrack = projectedCombined >= 1300;
+  const gap = Math.max(0, 1300 - projectedCombined);
+
+  return (
+    <div className="sat-next-step" style={{ borderColor: onTrack ? 'var(--sat-success)' : 'var(--sat-warning)', marginBottom: 16 }}>
+      <div className="sat-next-step__badge" style={{ background: onTrack ? 'var(--sat-success)' : 'var(--sat-warning)' }}>
+        TEST DAY PROJECTION
+      </div>
+      <h3 className="sat-next-step__heading">
+        {onTrack
+          ? `On track for ${projectedCombined} by test day`
+          : `Projected ${projectedCombined} — ${gap} points to go`
+        }
+      </h3>
+      <p className="sat-next-step__detail">
+        {daysRemaining} days remaining {'\u2022'} {totalSessions} sessions completed
+        {improving ? ' \u2022 Accuracy trending up' : declining ? ' \u2022 Accuracy slipping — increase practice volume' : ''}
+      </p>
+      <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginTop: 8 }}>
+        <div className="sat-stat" style={{ flex: '1 1 140px', minWidth: 0 }}>
+          <div className="sat-stat__label">Current</div>
+          <div className="sat-stat__value" style={{ fontSize: 22 }}>{currentCombined || '—'}</div>
+        </div>
+        <div className="sat-stat" style={{ flex: '1 1 140px', minWidth: 0 }}>
+          <div className="sat-stat__label">Projected</div>
+          <div className="sat-stat__value" style={{ fontSize: 22, color: onTrack ? 'var(--sat-success)' : 'var(--sat-warning)' }}>{projectedCombined}</div>
+        </div>
+        <div className="sat-stat" style={{ flex: '1 1 140px', minWidth: 0 }}>
+          <div className="sat-stat__label">Target</div>
+          <div className="sat-stat__value" style={{ fontSize: 22 }}>1300</div>
+        </div>
+        {reviewStats.total > 0 ? (
+          <div className="sat-stat" style={{ flex: '1 1 140px', minWidth: 0 }}>
+            <div className="sat-stat__label">Review Queue</div>
+            <div className="sat-stat__value" style={{ fontSize: 22 }}>
+              {reviewStats.due_today > 0 ? `${reviewStats.due_today} due` : `${reviewStats.total} queued`}
+            </div>
+          </div>
+        ) : null}
+      </div>
+      {!onTrack ? (
+        <p className="sat-next-step__detail" style={{ marginTop: 10, marginBottom: 0 }}>
+          <strong>To close the gap:</strong> Focus on your weakest skills daily, complete every spaced review, and maintain 6+ sessions per week.
+        </p>
+      ) : null}
+    </div>
+  );
 }
 
 export default function ProgressPage({ progress, userId }) {
@@ -32,6 +168,8 @@ export default function ProgressPage({ progress, userId }) {
   return (
     <section className="sat-panel">
       <h2>Progress Analytics</h2>
+
+      <ScoreProjection metrics={metrics} />
 
       <div className="sat-combined-score">
         <div className={`sat-combined-score__value sat-combined-score__value--${combinedScoreTone(combinedScore)}`}>

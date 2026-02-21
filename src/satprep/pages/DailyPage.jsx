@@ -5,6 +5,7 @@ import SessionRunner from '../components/SessionRunner';
 import SessionSummary from '../components/SessionSummary';
 import { generateDailyMission } from '../lib/apiClient';
 import { getQuestionById } from '../lib/selection';
+import { getDueReviewIds, getReviewStats } from '../lib/spacedRepetition';
 import { friendlyDate, getPlanDay, getWeekForDay, SAT_PLAN_WEEKS, toDateKey } from '../lib/time';
 
 const COACH_PLAYBOOK = {
@@ -106,6 +107,69 @@ function NextStepBanner({ hasDiagnostic, mission, missionQuestionCount, summary,
       <h3 className="sat-next-step__heading">{heading}</h3>
       <p className="sat-next-step__detail">{detail}</p>
       {action}
+    </div>
+  );
+}
+
+function DailyProjection() {
+  const projection = useMemo(() => {
+    try {
+      const raw = window.localStorage.getItem('satprep.sessionHistory.v1');
+      const history = raw ? JSON.parse(raw) : [];
+      if (history.length < 2) return null;
+
+      const today = toDateKey();
+      const planDay = getPlanDay(today);
+      const totalPlanDays = SAT_PLAN_WEEKS * 7;
+      const daysRemaining = Math.max(0, totalPlanDays - planDay);
+
+      const totalCorrect = history.reduce((s, h) => s + (h.correctCount || 0), 0);
+      const totalAttempts = history.reduce((s, h) => s + (h.totalCount || 0), 0);
+      if (totalAttempts < 5) return null;
+
+      const accuracy = totalCorrect / totalAttempts;
+      const projectedScore = Math.round(200 + accuracy * 600);
+      const reviewStats = getReviewStats();
+
+      return { daysRemaining, projectedScore, totalSessions: history.length, accuracy, reviewStats };
+    } catch {
+      return null;
+    }
+  }, []);
+
+  if (!projection) return null;
+
+  const onTrack = projection.projectedScore * 2 >= 1300;
+  return (
+    <div className="sat-alert" style={{ marginTop: 12, borderLeft: `3px solid ${onTrack ? 'var(--sat-success)' : 'var(--sat-warning)'}` }}>
+      <strong>Test Day Projection:</strong> Math ~{projection.projectedScore} ({Math.round(projection.accuracy * 100)}% accuracy across {projection.totalSessions} sessions)
+      {' \u2022 '}{projection.daysRemaining} days remaining
+      {projection.reviewStats.due_today > 0 ? ` \u2022 ${projection.reviewStats.due_today} review questions due` : ''}
+    </div>
+  );
+}
+
+function SpacedReviewBanner({ today, onStartReview }) {
+  const dueIds = useMemo(() => getDueReviewIds(today), [today]);
+  const stats = useMemo(() => getReviewStats(), []);
+
+  if (!dueIds.length) return null;
+
+  return (
+    <div className="sat-next-step" style={{ borderColor: 'var(--sat-warning)' }}>
+      <div className="sat-next-step__badge" style={{ background: 'var(--sat-warning)' }}>SPACED REVIEW</div>
+      <h3 className="sat-next-step__heading">{dueIds.length} question{dueIds.length !== 1 ? 's' : ''} due for review</h3>
+      <p className="sat-next-step__detail">
+        These are questions you missed before. Reviewing them at the right intervals locks the learning in.
+        {stats.upcoming > 0 ? ` (${stats.upcoming} more scheduled for later this week)` : ''}
+      </p>
+      <button
+        type="button"
+        className="sat-btn sat-btn--primary"
+        onClick={() => onStartReview(dueIds)}
+      >
+        Start Spaced Review ({dueIds.length} Q)
+      </button>
     </div>
   );
 }
@@ -229,8 +293,16 @@ export default function DailyPage({ onRefreshProgress, progressMetrics, navigate
         <AiStatusBadge />
       </div>
       <p>
-        {friendlyDate(today)} {'\u2022'} Day {planDay} of 28 {'\u2022'} Week {planWeek}
+        {friendlyDate(today)} {'\u2022'} Day {planDay} of {SAT_PLAN_WEEKS * 7} {'\u2022'} Week {planWeek}
       </p>
+
+      <SpacedReviewBanner today={today} onStartReview={(ids) => {
+        const reviewSet = ids.map(getQuestionById).filter(Boolean);
+        if (reviewSet.length) {
+          setSummary(null);
+          setReviewQuestions(reviewSet);
+        }
+      }} />
 
       <NextStepBanner
         hasDiagnostic={hasDiagnostic}
@@ -241,6 +313,8 @@ export default function DailyPage({ onRefreshProgress, progressMetrics, navigate
       />
 
       <div className="sat-alert">{weekFocus}</div>
+
+      <DailyProjection />
 
       {missionOffline ? (
         <div className="sat-alert" style={{ marginTop: 12 }}>
