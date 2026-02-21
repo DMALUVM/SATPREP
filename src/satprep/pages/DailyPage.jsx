@@ -35,11 +35,15 @@ const COACH_PLAYBOOK = {
   ],
 };
 
-function uniqueById(items) {
+function mergeQuestionsById(items) {
   const map = new Map();
   items.forEach((item) => {
     if (!item?.id) return;
-    if (!map.has(item.id)) map.set(item.id, item);
+    const current = map.get(item.id) || {};
+    map.set(item.id, {
+      ...current,
+      ...item,
+    });
   });
   return [...map.values()];
 }
@@ -63,6 +67,7 @@ export default function DailyPage({ onRefreshProgress, progressMetrics }) {
   const [mission, setMission] = useState(null);
   const [missionMeta, setMissionMeta] = useState(null);
   const [missionQuestions, setMissionQuestions] = useState([]);
+  const [missionOffline, setMissionOffline] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [summary, setSummary] = useState(null);
@@ -85,9 +90,15 @@ export default function DailyPage({ onRefreshProgress, progressMetrics }) {
   const missionQuestionList = useMemo(() => {
     if (!mission) return [];
     const ids = mission.tasks.flatMap((task) => task.question_ids || []);
+
     const fromApi = ids.map((id) => missionQuestions.find((q) => q.id === id)).filter(Boolean);
     const fromLocal = ids.map((id) => getQuestionById(id)).filter(Boolean);
-    return uniqueById([...fromApi, ...fromLocal]);
+    const merged = mergeQuestionsById([...fromApi, ...fromLocal]);
+
+    // Keep original task order stable.
+    return ids
+      .map((id) => merged.find((q) => q.id === id))
+      .filter(Boolean);
   }, [mission, missionQuestions]);
 
   async function fetchMission() {
@@ -98,6 +109,7 @@ export default function DailyPage({ onRefreshProgress, progressMetrics }) {
       setMission(data.mission);
       setMissionMeta(data.mission_metadata || null);
       setMissionQuestions(data.questions || []);
+      setMissionOffline(Boolean(data.offline));
       setSummary(null);
     } catch (err) {
       setError(err.message || 'Failed to generate mission');
@@ -138,6 +150,12 @@ export default function DailyPage({ onRefreshProgress, progressMetrics }) {
         {friendlyDate(today)} • Day {planDay} of 28 • Week {planWeek}
       </p>
       <div className="sat-alert">{weekFocus}</div>
+
+      {missionOffline ? (
+        <div className="sat-alert" style={{ marginTop: 12 }}>
+          Offline mission mode: this plan is running locally and will sync to cloud after reconnect.
+        </div>
+      ) : null}
 
       <div className="sat-actions-row">
         <button type="button" className="sat-btn sat-btn--primary" onClick={fetchMission} disabled={busy}>

@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import NavBar from './components/NavBar';
 import { useSatRoute } from './hooks/useSatRoute';
-import { fetchProgress } from './lib/apiClient';
+import { fetchProgress, getOfflineSyncSnapshot, subscribeOfflineSync } from './lib/apiClient';
 import { getSupabaseBrowserClient } from './lib/supabaseBrowser';
 import AuthPage from './pages/AuthPage';
 import DailyPage from './pages/DailyPage';
@@ -33,8 +33,16 @@ export default function SatPrepApp() {
   const [loading, setLoading] = useState(true);
   const [loadingProgress, setLoadingProgress] = useState(false);
   const [error, setError] = useState('');
+  const [syncState, setSyncState] = useState(() => getOfflineSyncSnapshot());
 
   const onboardingComplete = !!profile?.settings?.onboarding_complete;
+
+  useEffect(() => {
+    const unsubscribe = subscribeOfflineSync((snapshot) => {
+      setSyncState(snapshot);
+    });
+    return unsubscribe;
+  }, []);
 
   useEffect(() => {
     const supabase = getSupabaseBrowserClient();
@@ -190,6 +198,21 @@ export default function SatPrepApp() {
     <div className="sat-shell">
       <NavBar route={route} navigate={navigate} role={profile.role} onSignOut={handleSignOut} />
       <main className="sat-main">
+        {!syncState.online ? (
+          <div className="sat-alert sat-alert--danger">
+            Offline mode active: training continues locally. Data will auto-sync when internet returns.
+          </div>
+        ) : null}
+        {syncState.online && syncState.pending_total > 0 ? (
+          <div className="sat-alert">
+            Reconnected: syncing {syncState.pending_total} queued updates to cloud...
+          </div>
+        ) : null}
+        {progress?.offline ? (
+          <div className="sat-alert">
+            Showing cached progress snapshot while offline.
+          </div>
+        ) : null}
         {loadingProgress ? <div className="sat-alert">Refreshing progress…</div> : null}
         {error ? <div className="sat-alert sat-alert--danger">{error}</div> : null}
         {renderPage()}

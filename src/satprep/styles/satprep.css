@@ -536,3 +536,69 @@
     margin-left: 0;
   }
 }
+
+.sat-toggle--compact {
+  margin: 0 0 12px;
+}
+
+.sat-feedback__badges {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+
+.sat-pill {
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.sat-pill--success {
+  background: rgba(6, 118, 71, 0.14);
+  color: var(--sat-success);
+}
+
+.sat-pill--danger {
+  background: rgba(180, 35, 24, 0.14);
+  color: #8f291d;
+}
+
+.sat-pill--neutral {
+  background: rgba(15, 31, 47, 0.08);
+  color: var(--sat-subtle);
+}
+
+.sat-feedback__coach-copy {
+  margin: 0 0 8px;
+  font-weight: 600;
+}
+
+.sat-feedback__locked {
+  margin-top: 10px;
+  padding: 10px;
+  border-radius: 10px;
+  border: 1px dashed rgba(15, 31, 47, 0.26);
+  background: rgba(15, 31, 47, 0.04);
+}
+
+.sat-socratic {
+  margin-top: 12px;
+  padding: 10px;
+  border: 1px solid rgba(239, 91, 42, 0.34);
+  border-radius: 10px;
+  background: rgba(239, 91, 42, 0.08);
+}
+
+.sat-socratic p {
+  margin: 0;
+}
+
+.sat-socratic__prompt {
+  margin-top: 8px !important;
+  font-weight: 600;
+  line-height: 1.4;
+}

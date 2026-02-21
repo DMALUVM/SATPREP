@@ -9,7 +9,7 @@ const WEEK_PLAN = [
 ];
 
 const DAILY_SEQUENCE = [
-  ['Warm-up (8-10 min)', 'Rework yesterday’s misses and explain each fix out loud.'],
+  ['Warm-up (8-10 min)', 'Rework yesterday\'s misses and explain each fix out loud.'],
   ['Adaptive Drill (20 min)', 'Attack the weakest two skills first while fresh.'],
   ['Timed Block (15-20 min)', 'Work under clock pressure. Do not stall on one problem.'],
   ['Review Lock (8-10 min)', 'Write two mistake patterns and two rules for tomorrow.'],
@@ -55,6 +55,20 @@ const WHEN_NOT_TO_USE_DESMOS = [
   'Do not start with Desmos if you have not translated the problem into math yet.',
   'Do not over-graph simple arithmetic that is faster by direct calculation.',
   'Do not trust an output unless it answers the exact thing the question asks.',
+];
+
+const COACHING_FLOW = [
+  'After each question, read your mistake type badge: Concept, Setup, Time, or Pace.',
+  'Use Socratic Tutor Mode: answer coach questions before opening the full solution.',
+  'Apply the "What To Do Next" action immediately on a similar question.',
+  'Do not move on until the correction pattern is clear and repeatable.',
+];
+
+const OFFLINE_PLAYBOOK = [
+  'Open SAT Prep while online at least once on the Chromebook to cache the app.',
+  'When offline, keep training normally. Attempts/sessions are stored locally.',
+  'Reconnect and keep the tab open for 1-2 minutes so cloud sync finishes.',
+  'If you see "queued updates," do not log out until the queue returns to 0.',
 ];
 
 export default function OnboardingPage({ profile, onComplete, navigate }) {
@@ -189,6 +203,21 @@ export default function OnboardingPage({ profile, onComplete, navigate }) {
             {WHEN_NOT_TO_USE_DESMOS.map((step) => <li key={step}>{step}</li>)}
           </ul>
           <p className="sat-muted">Question review now includes a specific Desmos Method when applicable.</p>
+        </article>
+      </div>
+
+      <div className="sat-grid-2" style={{ marginTop: 12 }}>
+        <article className="sat-task-card">
+          <h3>How The Coach Works</h3>
+          <ol className="sat-list">
+            {COACHING_FLOW.map((step) => <li key={step}>{step}</li>)}
+          </ol>
+        </article>
+        <article className="sat-task-card">
+          <h3>Offline Chromebook Mode</h3>
+          <ol className="sat-list">
+            {OFFLINE_PLAYBOOK.map((step) => <li key={step}>{step}</li>)}
+          </ol>
         </article>
       </div>
 
