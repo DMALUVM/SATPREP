@@ -27,6 +27,7 @@ export default function ProfileSetupPage({ user, onComplete }) {
           coach_tone: 'firm-supportive',
           timing_mode: 'standard',
           daily_target_minutes: 55,
+          plan_weeks: 4,
         },
       };
 

@@ -3,7 +3,7 @@ import { completeSession, fetchAiExplanation, submitAttempt } from '../lib/apiCl
 import { buildCoachingPlan } from '../lib/coaching';
 import { getDesmosGuide } from '../lib/desmosGuide';
 import { estimateSessionWindow } from '../lib/sessionTime';
-import { toStudentFriendlyMathList, toStudentFriendlyMathText } from '../lib/textFormat';
+import MathText from './MathText';
 
 const SESSION_SAVE_KEY = 'satprep.activeSession.v1';
 
@@ -208,48 +208,27 @@ export default function SessionRunner({
     return estimateSessionWindow({ questions, timeLimitSeconds }).label;
   }, [plannedTimeLabel, questions, timeLimitSeconds]);
 
-  const { displayPassage, displayStem } = useMemo(() => {
+  const { rawPassage, rawStem } = useMemo(() => {
     if (currentQuestion?.passage) {
       return {
-        displayPassage: toStudentFriendlyMathText(currentQuestion.passage),
-        displayStem: toStudentFriendlyMathText(currentQuestion.stem || ''),
+        rawPassage: currentQuestion.passage,
+        rawStem: currentQuestion.stem || '',
       };
     }
-    const rawStem = currentQuestion?.stem || '';
-    const parts = rawStem.split('\n\n');
+    const stem = currentQuestion?.stem || '';
+    const parts = stem.split('\n\n');
     if (parts.length >= 2) {
       const longest = parts.reduce((a, b) => (a.length >= b.length ? a : b), '');
       const rest = parts.filter((p) => p !== longest).join(' ');
-      return {
-        displayPassage: toStudentFriendlyMathText(longest),
-        displayStem: toStudentFriendlyMathText(rest),
-      };
+      return { rawPassage: longest, rawStem: rest };
     }
-    return {
-      displayPassage: '',
-      displayStem: toStudentFriendlyMathText(rawStem),
-    };
+    return { rawPassage: '', rawStem: stem };
   }, [currentQuestion]);
 
-  const displayChoices = useMemo(
-    () => toStudentFriendlyMathList(currentQuestion?.choices || []),
-    [currentQuestion]
-  );
-
-  const displaySteps = useMemo(
-    () => toStudentFriendlyMathList(currentQuestion?.explanation_steps || []),
-    [currentQuestion]
-  );
-
-  const displayStrategy = useMemo(
-    () => toStudentFriendlyMathText(currentQuestion?.strategy_tip || ''),
-    [currentQuestion]
-  );
-
-  const displayTrap = useMemo(
-    () => toStudentFriendlyMathText(currentQuestion?.trap_tag || ''),
-    [currentQuestion]
-  );
+  const rawChoices = currentQuestion?.choices || [];
+  const rawSteps = currentQuestion?.explanation_steps || [];
+  const rawStrategy = currentQuestion?.strategy_tip || '';
+  const rawTrap = currentQuestion?.trap_tag || '';
 
   const desmosGuide = useMemo(
     () => getDesmosGuide(currentQuestion),
@@ -659,16 +638,16 @@ export default function SessionRunner({
           <span>{currentQuestion.skill}</span>
           <span>Difficulty {currentQuestion.difficulty}</span>
         </div>
-        {displayPassage ? (
+        {rawPassage ? (
           <div className="sat-passage">
-            <p>{displayPassage}</p>
+            <p><MathText text={rawPassage} /></p>
           </div>
         ) : null}
-        <h3 className="sat-question-card__stem">{displayStem}</h3>
+        <h3 className="sat-question-card__stem"><MathText text={rawStem} /></h3>
 
         {currentQuestion.format === 'multiple_choice' ? (
           <div className="sat-choice-list">
-            {displayChoices.map((choice, choiceIndex) => {
+            {rawChoices.map((choice, choiceIndex) => {
               const checked = String(currentInput) === String(choiceIndex);
               const isCorrectChoice = review && Number(currentQuestion.answer_key) === choiceIndex;
               const isWrongPick = review && checked && !review.isCorrect;
@@ -687,7 +666,7 @@ export default function SessionRunner({
                     disabled={!!review}
                   >
                     <span className="sat-choice__letter">{String.fromCharCode(65 + choiceIndex)}</span>
-                    <span>{choice}</span>
+                    <span><MathText text={choice} /></span>
                   </button>
                   {!review ? (
                     <button
@@ -773,16 +752,16 @@ export default function SessionRunner({
 
             <p className="sat-feedback__coach-copy">{renderCoachTone(coachTone, review)}</p>
             <p>
-              <strong>Coach Diagnosis:</strong> {toStudentFriendlyMathText(coachingPlan.coachFix)}
+              <strong>Coach Diagnosis:</strong> <MathText text={coachingPlan.coachFix} />
             </p>
             <p>
-              <strong>What To Do Next:</strong> {toStudentFriendlyMathText(coachingPlan.nextAction)}
+              <strong>What To Do Next:</strong> <MathText text={coachingPlan.nextAction} />
             </p>
 
             {coachingPlan.checklist.length ? (
               <ul className="sat-list" style={{ marginTop: 8 }}>
-                {toStudentFriendlyMathList(coachingPlan.checklist).map((step) => (
-                  <li key={`${currentQuestion.id}-check-${step.slice(0, 16)}`}>{step}</li>
+                {coachingPlan.checklist.map((step, i) => (
+                  <li key={`${currentQuestion.id}-check-${i}`}><MathText text={step} /></li>
                 ))}
               </ul>
             ) : null}
@@ -795,7 +774,7 @@ export default function SessionRunner({
                 {shouldGateSolution && !isSolutionRevealed ? (
                   <>
                     <p className="sat-socratic__prompt">
-                      Coach question {activeSocraticIndex + 1}/{socraticPrompts.length}: {toStudentFriendlyMathText(activeSocraticPrompt)}
+                      Coach question {activeSocraticIndex + 1}/{socraticPrompts.length}: <MathText text={activeSocraticPrompt} />
                     </p>
                     <div className="sat-session__actions" style={{ marginTop: 10 }}>
                       {canAdvanceSocratic ? (
@@ -825,18 +804,18 @@ export default function SessionRunner({
 
             {isSolutionRevealed ? (
               <>
-                {displaySteps.length ? (
+                {rawSteps.length ? (
                   <ol>
-                    {displaySteps.map((step) => (
-                      <li key={`${currentQuestion.id}-${step.slice(0, 14)}`}>{step}</li>
+                    {rawSteps.map((step, i) => (
+                      <li key={`${currentQuestion.id}-step-${i}`}><MathText text={step} /></li>
                     ))}
                   </ol>
                 ) : null}
                 <p>
-                  <strong>Strategy:</strong> {displayStrategy}
+                  <strong>Strategy:</strong> <MathText text={rawStrategy} />
                 </p>
                 <p>
-                  <strong>Common trap:</strong> {displayTrap}
+                  <strong>Common trap:</strong> <MathText text={rawTrap} />
                 </p>
                 {desmosGuide ? (
                   <div className="sat-desmos-tip">
@@ -844,8 +823,8 @@ export default function SessionRunner({
                       <strong>{desmosGuide.title}:</strong> Fast calculator path for this type.
                     </p>
                     <ol>
-                      {toStudentFriendlyMathList(desmosGuide.steps || []).map((step) => (
-                        <li key={`${currentQuestion.id}-desmos-${step.slice(0, 16)}`}>{step}</li>
+                      {(desmosGuide.steps || []).map((step, i) => (
+                        <li key={`${currentQuestion.id}-desmos-${i}`}><MathText text={step} /></li>
                       ))}
                     </ol>
                   </div>

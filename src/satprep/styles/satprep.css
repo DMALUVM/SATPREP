@@ -1188,6 +1188,19 @@
   }
 }
 
+/* KaTeX overrides — match app font sizing */
+.katex {
+  font-size: 1.05em;
+}
+
+.sat-question-card__stem .katex {
+  font-size: 1.1em;
+}
+
+.sat-choice .katex {
+  font-size: 1em;
+}
+
 /* Loading spinner */
 .sat-loader {
   width: 36px;

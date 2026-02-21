@@ -108,7 +108,7 @@ export default function AuthPage() {
     <main className="sat-auth">
       <section className="sat-auth__panel">
         <div className="sat-auth__eyebrow">SAT Math + Verbal 1300+ Accelerator</div>
-        <h1>Sign in to start the 4-week score climb</h1>
+        <h1>Sign in to start your SAT score climb</h1>
         <p>
           Student and parent each use their own account. Use password sign-in for daily reliability,
           keep magic link as backup.
@@ -204,8 +204,8 @@ export default function AuthPage() {
         <ul className="sat-auth__list">
           <li>Plan start date: Sunday, February 22, 2026</li>
           <li>Daily target: 45-60 focused minutes</li>
-          <li>Math target: 650-700 in four weeks</li>
-          <li>Verbal target: 680-720 in four weeks</li>
+          <li>Math target: 650-700</li>
+          <li>Verbal target: 680-720</li>
           <li>Combined target: 1300+ total score</li>
         </ul>
       </section>

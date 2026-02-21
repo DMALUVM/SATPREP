@@ -5,7 +5,7 @@ import SessionRunner from '../components/SessionRunner';
 import SessionSummary from '../components/SessionSummary';
 import { generateDailyMission } from '../lib/apiClient';
 import { getQuestionById } from '../lib/selection';
-import { friendlyDate, getPlanDay, getWeekForDay, toDateKey } from '../lib/time';
+import { friendlyDate, getPlanDay, getWeekForDay, SAT_PLAN_WEEKS, toDateKey } from '../lib/time';
 
 const COACH_PLAYBOOK = {
   'linear-equations': [
@@ -127,14 +127,19 @@ export default function DailyPage({ onRefreshProgress, progressMetrics, navigate
   const missionMinutes = mission?.target_minutes || 55;
   const weakSkillRows = (progressMetrics?.weak_skills || []).slice(0, 3).map(buildSkillActionRow);
   const hasDiagnostic = (progressMetrics?.totals?.attempts || 0) > 0;
-  const weekFocus =
-    planWeek === 1
-      ? 'Week 1 Foundation: equations, graphing, systems, and clean setup.'
-      : planWeek === 2
-        ? 'Week 2 Core Skills: percentages, statistics, quadratics, and function fluency.'
-        : planWeek === 3
-          ? 'Week 3 Level-Up: medium-hard mixed sets under time pressure.'
-          : 'Week 4 Peak Mode: full simulations, error loop tightening, and confidence execution.';
+  const weekFocus = SAT_PLAN_WEEKS === 3
+    ? (planWeek === 1
+        ? 'Week 1 Foundation + Acceleration: diagnostic, core cleanup, weak-skill drills, and pacing.'
+        : planWeek === 2
+          ? 'Week 2 Pressure: timed mixed sets, faster decisions, medium-hard progression.'
+          : 'Week 3 Peak: full simulations, error loop tightening, and confidence execution.')
+    : (planWeek === 1
+        ? 'Week 1 Foundation: equations, graphing, systems, and clean setup.'
+        : planWeek === 2
+          ? 'Week 2 Core Skills: percentages, statistics, quadratics, and function fluency.'
+          : planWeek === 3
+            ? 'Week 3 Level-Up: medium-hard mixed sets under time pressure.'
+            : 'Week 4 Peak Mode: full simulations, error loop tightening, and confidence execution.');
 
   const missionQuestionList = useMemo(() => {
     if (!mission) return [];

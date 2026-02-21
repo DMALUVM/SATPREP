@@ -1,11 +1,17 @@
 import React, { useMemo, useState } from 'react';
 import { getSupabaseBrowserClient } from '../lib/supabaseBrowser';
 
-const WEEK_PLAN = [
+const WEEK_PLAN_4 = [
   ['Week 1 (Foundation)', 'Diagnostic, core algebra cleanup, error pattern detection.'],
   ['Week 2 (Acceleration)', 'Weak-skill drills + medium/hard progression and pacing discipline.'],
   ['Week 3 (Pressure)', 'More timed mixed sets, faster decisions, fewer stalls.'],
   ['Week 4 (Peak)', 'Simulation + targeted cleanup + confidence execution.'],
+];
+
+const WEEK_PLAN_3 = [
+  ['Week 1 (Foundation + Acceleration)', 'Diagnostic on Day 1, core cleanup, then immediately into weak-skill drills and pacing.'],
+  ['Week 2 (Pressure)', 'Timed mixed sets, faster decisions, medium-hard progression under clock.'],
+  ['Week 3 (Peak)', 'Full simulations, error loop tightening, and confidence execution.'],
 ];
 
 const DAILY_SEQUENCE = [
@@ -31,10 +37,10 @@ const MISTAKE_PROTOCOL = [
 
 const SYMBOL_GUIDE = [
   ['sin / cos / tan', 'Trig ratios — same notation the SAT uses.'],
-  ['(a/b)', 'Fraction format ("a over b").'],
-  ['\u221A(x)', 'Square root — the value that multiplied by itself gives x.'],
-  ['x\u00B2', 'Squared (x times x). Exponents use superscript like the real test.'],
-  ['\u03C0', 'Pi (3.14159...). \u03B8 = theta (angle measure).'],
+  ['Fractions', 'Rendered with a horizontal bar, just like the real test.'],
+  ['Square roots', 'Rendered with a proper radical symbol, same as test day.'],
+  ['Exponents', 'Superscript notation matching the Bluebook display.'],
+  ['\u03C0 and \u03B8', 'Pi (3.14159...) and theta (angle measure).'],
   ['\u2264 \u2265 \u2260', 'Less than or equal, greater than or equal, not equal.'],
 ];
 
@@ -77,6 +83,9 @@ export default function OnboardingPage({ profile, onComplete, navigate }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
+  const [planWeeks, setPlanWeeks] = useState(
+    Number(profile?.settings?.plan_weeks || 4)
+  );
   const [targetMinutes, setTargetMinutes] = useState(
     Number(profile?.settings?.daily_target_minutes || 55)
   );
@@ -97,6 +106,7 @@ export default function OnboardingPage({ profile, onComplete, navigate }) {
       const supabase = getSupabaseBrowserClient();
       const settings = {
         ...(profile?.settings || {}),
+        plan_weeks: [3, 4].includes(Number(planWeeks)) ? Number(planWeeks) : 4,
         daily_target_minutes: Math.max(30, Math.min(120, Number(targetMinutes) || 55)),
         days_per_week_goal: Math.max(4, Math.min(7, Number(daysPerWeek) || 6)),
         onboarding_complete: true,
@@ -134,9 +144,9 @@ export default function OnboardingPage({ profile, onComplete, navigate }) {
 
       <div className="sat-grid-2" style={{ marginTop: 14 }}>
         <article className="sat-task-card">
-          <h3>4-Week Roadmap</h3>
+          <h3>{planWeeks}-Week Roadmap</h3>
           <ol className="sat-list">
-            {WEEK_PLAN.map(([label, desc]) => (
+            {(planWeeks === 3 ? WEEK_PLAN_3 : WEEK_PLAN_4).map(([label, desc]) => (
               <li key={label}><strong>{label}:</strong> {desc}</li>
             ))}
           </ol>
@@ -193,7 +203,7 @@ export default function OnboardingPage({ profile, onComplete, navigate }) {
               <li key={symbol}><strong>{symbol}:</strong> {meaning}</li>
             ))}
           </ul>
-          <p className="sat-muted">Questions are displayed in student-friendly notation.</p>
+          <p className="sat-muted">Math renders with proper typesetting, matching the test-day Bluebook display.</p>
         </article>
         <article className="sat-task-card">
           <h3>Desmos Playbook</h3>
@@ -225,6 +235,13 @@ export default function OnboardingPage({ profile, onComplete, navigate }) {
 
       <div className="sat-grid-form" style={{ marginTop: 14 }}>
         <label>
+          Plan duration
+          <select value={planWeeks} onChange={(event) => setPlanWeeks(Number(event.target.value))}>
+            <option value={3}>3 weeks</option>
+            <option value={4}>4 weeks</option>
+          </select>
+        </label>
+        <label>
           Daily target minutes
           <select value={targetMinutes} onChange={(event) => setTargetMinutes(Number(event.target.value))}>
             <option value={45}>45</option>
@@ -244,10 +261,6 @@ export default function OnboardingPage({ profile, onComplete, navigate }) {
         <label>
           Weekly minutes
           <input value={`${estWeeklyMinutes} min/week`} readOnly disabled />
-        </label>
-        <label>
-          Pacing targets
-          <input value="Math <=95s, Verbal <=85s" readOnly disabled />
         </label>
       </div>
 

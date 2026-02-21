@@ -1,13 +1,15 @@
 // Default dates — overridden per-user via profile.sat_start_date
 export let SAT_PLAN_START_DATE = '2026-02-22';
 export let SAT_PLAN_END_DATE = '2026-03-21';
+export let SAT_PLAN_WEEKS = 4;
 
-export function setPlanDates(startDate) {
+export function setPlanDates(startDate, planWeeks) {
   if (!startDate) return;
   SAT_PLAN_START_DATE = startDate;
-  // 28-day plan
+  SAT_PLAN_WEEKS = planWeeks && [3, 4].includes(Number(planWeeks)) ? Number(planWeeks) : 4;
+  const totalDays = SAT_PLAN_WEEKS * 7;
   const start = new Date(`${startDate}T00:00:00`);
-  start.setDate(start.getDate() + 27);
+  start.setDate(start.getDate() + totalDays - 1);
   SAT_PLAN_END_DATE = toDateKey(start);
 }
 
@@ -36,7 +38,8 @@ export function getWeekForDay(day) {
   if (day <= 7) return 1;
   if (day <= 14) return 2;
   if (day <= 21) return 3;
-  return 4;
+  if (SAT_PLAN_WEEKS >= 4) return 4;
+  return 3; // 3-week plan caps at week 3
 }
 
 export function friendlyDate(dateKey) {
