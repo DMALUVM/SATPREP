@@ -62,7 +62,7 @@ export default function DiagnosticPage({ onRefreshProgress }) {
           </ol>
         </article>
       </div>
-      <button type="button" className="sat-btn sat-btn--primary" onClick={() => setStarted(true)}>
+      <button type="button" className="sat-btn sat-btn--primary" onClick={() => setStarted(true)} style={{ marginTop: 12 }}>
         Start Diagnostic
       </button>
 

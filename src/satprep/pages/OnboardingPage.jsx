@@ -30,10 +30,12 @@ const MISTAKE_PROTOCOL = [
 ];
 
 const SYMBOL_GUIDE = [
-  ['sine / cosine / tangent', 'Trig ratios in right triangles.'],
-  ['a/b', 'Fraction format ("a over b").'],
-  ['square root of (...)', 'Value that multiplied by itself gives the inside number.'],
-  ['^2', 'Squared (multiply the number by itself).'],
+  ['sin / cos / tan', 'Trig ratios — same notation the SAT uses.'],
+  ['(a/b)', 'Fraction format ("a over b").'],
+  ['\u221A(x)', 'Square root — the value that multiplied by itself gives x.'],
+  ['x\u00B2', 'Squared (x times x). Exponents use superscript like the real test.'],
+  ['\u03C0', 'Pi (3.14159...). \u03B8 = theta (angle measure).'],
+  ['\u2264 \u2265 \u2260', 'Less than or equal, greater than or equal, not equal.'],
 ];
 
 const DIAGNOSTIC_PLAYBOOK = [

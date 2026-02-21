@@ -65,9 +65,15 @@ function splitExplanation(text) {
   const cleaned = text
     .replace(/\$\$?/g, '')
     .replace(/\\frac\{([^}]+)\}\{([^}]+)\}/g, '($1/$2)')
-    .replace(/\\cdot/g, ' * ')
-    .replace(/\\times/g, ' * ')
-    .replace(/\\sqrt\{([^}]+)\}/g, 'sqrt($1)')
+    .replace(/\\cdot/g, ' \u00B7 ')
+    .replace(/\\times/g, ' \u00D7 ')
+    .replace(/\\sqrt\{([^}]+)\}/g, '\u221A($1)')
+    .replace(/\\leq?\b/g, '\u2264')
+    .replace(/\\geq?\b/g, '\u2265')
+    .replace(/\\neq\b/g, '\u2260')
+    .replace(/\\pm\b/g, '\u00B1')
+    .replace(/\\pi\b/g, '\u03C0')
+    .replace(/\\theta\b/g, '\u03B8')
     .replace(/\\/g, '')
     .replace(/\s+/g, ' ')
     .trim();

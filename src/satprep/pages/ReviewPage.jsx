@@ -1,11 +1,13 @@
 import React, { useMemo, useState } from 'react';
 import SessionRunner from '../components/SessionRunner';
+import SessionSummary from '../components/SessionSummary';
 import { buildReviewSet } from '../lib/selection';
 import { estimateSessionFromConfig } from '../lib/sessionTime';
 import { toDateKey } from '../lib/time';
 
 export default function ReviewPage({ progressMetrics, onRefreshProgress }) {
   const [questions, setQuestions] = useState(null);
+  const [sessionSummary, setSessionSummary] = useState(null);
   const weakSkills = progressMetrics?.weak_skills || [];
   const estimate = useMemo(
     () => estimateSessionFromConfig({ count: 15, difficulty: 'medium', section: 'math' }),
@@ -25,8 +27,9 @@ export default function ReviewPage({ progressMetrics, onRefreshProgress }) {
         questions={questions}
         planDate={toDateKey()}
         onExit={() => setQuestions(null)}
-        onFinish={() => {
+        onFinish={(result) => {
           setQuestions(null);
+          setSessionSummary(result);
           onRefreshProgress?.();
         }}
       />
@@ -44,9 +47,14 @@ export default function ReviewPage({ progressMetrics, onRefreshProgress }) {
         type="button"
         className="sat-btn sat-btn--primary"
         onClick={() => setQuestions(buildReviewSet(progressMetrics, 15))}
+        style={{ marginTop: 12 }}
       >
         Start Review Session (15)
       </button>
+
+      {sessionSummary ? (
+        <SessionSummary summary={sessionSummary} onDismiss={() => setSessionSummary(null)} />
+      ) : null}
 
       {weakSkills.length ? (
         <div className="sat-table-wrap" style={{ marginTop: 16 }}>

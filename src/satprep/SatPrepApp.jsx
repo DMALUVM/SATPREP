@@ -134,9 +134,6 @@ export default function SatPrepApp() {
       navigate(onboardingComplete ? '/daily' : '/onboarding');
       return;
     }
-    if (profile.role !== 'parent' && !onboardingComplete && route === '/') {
-      navigate('/onboarding');
-    }
   }, [route, navigate, profile, onboardingComplete]);
 
   async function handleSignOut() {

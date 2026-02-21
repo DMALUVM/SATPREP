@@ -42,7 +42,7 @@ export default function TimedPage({ onRefreshProgress }) {
         <li>2-minute rule: if stuck, guess and move</li>
         <li>Post-session review is mandatory</li>
       </ul>
-      <button type="button" className="sat-btn sat-btn--primary" onClick={() => setStarted(true)}>
+      <button type="button" className="sat-btn sat-btn--primary" onClick={() => setStarted(true)} style={{ marginTop: 12 }}>
         Start Timed Simulation
       </button>
       {summary ? (

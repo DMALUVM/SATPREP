@@ -134,10 +134,28 @@ export default function SessionRunner({
     return estimateSessionWindow({ questions, timeLimitSeconds }).label;
   }, [plannedTimeLabel, questions, timeLimitSeconds]);
 
-  const displayStem = useMemo(
-    () => toStudentFriendlyMathText(currentQuestion?.stem || ''),
-    [currentQuestion]
-  );
+  const { displayPassage, displayStem } = useMemo(() => {
+    if (currentQuestion?.passage) {
+      return {
+        displayPassage: toStudentFriendlyMathText(currentQuestion.passage),
+        displayStem: toStudentFriendlyMathText(currentQuestion.stem || ''),
+      };
+    }
+    const rawStem = currentQuestion?.stem || '';
+    const parts = rawStem.split('\n\n');
+    if (parts.length >= 2) {
+      const longest = parts.reduce((a, b) => (a.length >= b.length ? a : b), '');
+      const rest = parts.filter((p) => p !== longest).join(' ');
+      return {
+        displayPassage: toStudentFriendlyMathText(longest),
+        displayStem: toStudentFriendlyMathText(rest),
+      };
+    }
+    return {
+      displayPassage: '',
+      displayStem: toStudentFriendlyMathText(rawStem),
+    };
+  }, [currentQuestion]);
 
   const displayChoices = useMemo(
     () => toStudentFriendlyMathList(currentQuestion?.choices || []),
@@ -478,6 +496,11 @@ export default function SessionRunner({
           <span>{currentQuestion.skill}</span>
           <span>Difficulty {currentQuestion.difficulty}</span>
         </div>
+        {displayPassage ? (
+          <div className="sat-passage">
+            <p>{displayPassage}</p>
+          </div>
+        ) : null}
         <h3 className="sat-question-card__stem">{displayStem}</h3>
 
         {currentQuestion.format === 'multiple_choice' ? (
@@ -540,6 +563,13 @@ export default function SessionRunner({
               </button>
             </>
           )}
+          <span className="sat-shortcut-hint">
+            {currentQuestion.format === 'multiple_choice' && !review
+              ? 'Keys: A/B/C/D to select, Enter to submit'
+              : review
+                ? 'Press Enter for next question'
+                : 'Press Enter to submit'}
+          </span>
         </div>
 
         {warning ? <div className="sat-alert">{warning}</div> : null}

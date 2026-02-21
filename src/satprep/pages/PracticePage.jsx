@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import SessionRunner from '../components/SessionRunner';
+import SessionSummary from '../components/SessionSummary';
 import {
   buildAdaptivePracticeSet,
   buildPracticeSet,
@@ -16,6 +17,7 @@ export default function PracticePage({ onRefreshProgress, progressMetrics }) {
   const [difficulty, setDifficulty] = useState('all');
   const [count, setCount] = useState(12);
   const [sessionQuestions, setSessionQuestions] = useState(null);
+  const [sessionSummary, setSessionSummary] = useState(null);
   const [useAdaptive, setUseAdaptive] = useState(true);
 
   const skills = useMemo(() => ['all', ...listSkills(domain)], [domain]);
@@ -33,8 +35,9 @@ export default function PracticePage({ onRefreshProgress, progressMetrics }) {
         questions={sessionQuestions}
         planDate={toDateKey()}
         onExit={() => setSessionQuestions(null)}
-        onFinish={() => {
+        onFinish={(result) => {
           setSessionQuestions(null);
+          setSessionSummary(result);
           onRefreshProgress?.();
         }}
       />
@@ -118,6 +121,10 @@ export default function PracticePage({ onRefreshProgress, progressMetrics }) {
       >
         Start Practice Session
       </button>
+
+      {sessionSummary ? (
+        <SessionSummary summary={sessionSummary} onDismiss={() => setSessionSummary(null)} />
+      ) : null}
     </section>
   );
 }

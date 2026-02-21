@@ -8,7 +8,7 @@ const STUDENT_LINKS = [
   ['/review', 'Review'],
   ['/verbal', 'Verbal 700+'],
   ['/progress', 'Progress'],
-  ['/onboarding', 'Start Here'],
+  ['/onboarding', 'Guide'],
 ];
 
 const PARENT_LINKS = [['/parent', 'Parent']];
