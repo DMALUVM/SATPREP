@@ -150,10 +150,11 @@ function DailyProjection() {
 }
 
 function TestDateEditor({ profile, onUpdateProfile }) {
-  const currentTestDate = profile?.sat_test_date || profile?.settings?.sat_test_date || SAT_TEST_DATE;
+  const currentTestDate = profile?.settings?.sat_test_date || SAT_TEST_DATE;
   const [editing, setEditing] = useState(false);
   const [dateValue, setDateValue] = useState(currentTestDate);
   const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState('');
 
   async function saveTestDate() {
     if (!dateValue || dateValue === currentTestDate) {
@@ -161,21 +162,23 @@ function TestDateEditor({ profile, onUpdateProfile }) {
       return;
     }
     setSaving(true);
+    setSaveError('');
     try {
       const supabase = getSupabaseBrowserClient();
       const settings = { ...(profile?.settings || {}), sat_test_date: dateValue };
       const { data, error } = await supabase
         .from('sat_profiles')
-        .update({ sat_test_date: dateValue, settings, updated_at: new Date().toISOString() })
+        .update({ settings, updated_at: new Date().toISOString() })
         .eq('user_id', profile.user_id)
         .select('*')
         .single();
       if (error) throw error;
-      setPlanDates(data.sat_start_date, dateValue);
+      // Update the plan in memory so all components pick up the new dates
+      setPlanDates(data.sat_start_date || profile.sat_start_date, dateValue);
       onUpdateProfile?.(data);
       setEditing(false);
-    } catch {
-      // silent — keep editor open
+    } catch (err) {
+      setSaveError(err?.message || 'Failed to save');
     } finally {
       setSaving(false);
     }
@@ -195,7 +198,7 @@ function TestDateEditor({ profile, onUpdateProfile }) {
   }
 
   return (
-    <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+    <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
       <input
         type="date"
         value={dateValue}
@@ -209,6 +212,7 @@ function TestDateEditor({ profile, onUpdateProfile }) {
       <button type="button" className="sat-btn sat-btn--ghost" style={{ fontSize: 13, padding: '4px 10px' }} onClick={() => setEditing(false)}>
         Cancel
       </button>
+      {saveError ? <span style={{ color: 'var(--sat-danger)', fontSize: 13 }}>{saveError}</span> : null}
     </div>
   );
 }

@@ -72,7 +72,7 @@ export default function OnboardingPage({ profile, onComplete, navigate }) {
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const [testDate, setTestDate] = useState(
-    profile?.sat_test_date || profile?.settings?.sat_test_date || SAT_TEST_DATE || '2026-03-11'
+    profile?.settings?.sat_test_date || SAT_TEST_DATE || '2026-03-11'
   );
   const [targetMinutes, setTargetMinutes] = useState(
     Number(profile?.settings?.daily_target_minutes || 55)
@@ -113,7 +113,6 @@ export default function OnboardingPage({ profile, onComplete, navigate }) {
         .from('sat_profiles')
         .update({
           settings,
-          sat_test_date: testDate,
           updated_at: new Date().toISOString(),
         })
         .eq('user_id', profile.user_id)

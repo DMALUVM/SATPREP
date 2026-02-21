@@ -24,7 +24,6 @@ export default function ProfileSetupPage({ user, onComplete }) {
         target_total_score: 1300,
         target_math_score: 650,
         sat_start_date: new Date().toISOString().slice(0, 10),
-        sat_test_date: testDate || '2026-03-11',
         settings: {
           coach_tone: 'firm-supportive',
           timing_mode: 'standard',

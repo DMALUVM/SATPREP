@@ -95,7 +95,7 @@ export default function SatPrepApp() {
         return;
       }
       if (data?.sat_start_date) {
-        const testDate = data?.sat_test_date || data?.settings?.sat_test_date || data?.settings?.plan_weeks;
+        const testDate = data?.settings?.sat_test_date || data?.settings?.plan_weeks;
         setPlanDates(data.sat_start_date, testDate);
       }
       setProfile(data || null);
