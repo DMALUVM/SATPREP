@@ -1,9 +1,34 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { completeSession, submitAttempt } from '../lib/apiClient';
 import { buildCoachingPlan } from '../lib/coaching';
 import { getDesmosGuide } from '../lib/desmosGuide';
 import { estimateSessionWindow } from '../lib/sessionTime';
 import { toStudentFriendlyMathList, toStudentFriendlyMathText } from '../lib/textFormat';
+
+const SESSION_SAVE_KEY = 'satprep.activeSession.v1';
+
+function saveSessionState(state) {
+  try {
+    window.localStorage.setItem(SESSION_SAVE_KEY, JSON.stringify(state));
+  } catch { /* ignore quota errors */ }
+}
+
+function loadSessionState(questionIds) {
+  try {
+    const raw = window.localStorage.getItem(SESSION_SAVE_KEY);
+    if (!raw) return null;
+    const saved = JSON.parse(raw);
+    const savedIds = (saved.questionIds || []).join(',');
+    const currentIds = questionIds.join(',');
+    if (savedIds !== currentIds) return null;
+    if (Date.now() - saved.savedAt > 3 * 60 * 60 * 1000) return null;
+    return saved;
+  } catch { return null; }
+}
+
+function clearSessionState() {
+  try { window.localStorage.removeItem(SESSION_SAVE_KEY); } catch { /* ignore */ }
+}
 
 function normalizeGridAnswer(value) {
   return String(value || '').trim().replace(/\s+/g, '');
@@ -52,20 +77,32 @@ export default function SessionRunner({
   onExit,
   coachTone = 'firm-supportive',
 }) {
-  const [index, setIndex] = useState(0);
-  const [answers, setAnswers] = useState({});
-  const [submitted, setSubmitted] = useState({});
+  const questionIds = useMemo(() => questions.map((q) => q.id), [questions]);
+  const [resumeOffer, setResumeOffer] = useState(() => {
+    const saved = loadSessionState(questionIds);
+    return saved ? saved : null;
+  });
+
+  const [index, setIndex] = useState(() => resumeOffer?.index || 0);
+  const [answers, setAnswers] = useState(() => resumeOffer?.answers || {});
+  const [submitted, setSubmitted] = useState(() => resumeOffer?.submitted || {});
   const [currentInput, setCurrentInput] = useState('');
-  const [sessionStart] = useState(() => Date.now());
+  const [sessionStart] = useState(() => resumeOffer?.sessionStart || Date.now());
   const [questionStart, setQuestionStart] = useState(() => Date.now());
-  const [secondsElapsed, setSecondsElapsed] = useState(0);
+  const [secondsElapsed, setSecondsElapsed] = useState(() => resumeOffer?.secondsElapsed || 0);
   const [sessionBusy, setSessionBusy] = useState(false);
-  const [warning, setWarning] = useState('');
+  const [warning, setWarning] = useState(resumeOffer ? 'Session restored from auto-save.' : '');
   const [socraticMode, setSocraticMode] = useState(true);
   const [socraticStepByQuestion, setSocraticStepByQuestion] = useState({});
   const [solutionRevealedByQuestion, setSolutionRevealedByQuestion] = useState({});
 
   const [confirmEnd, setConfirmEnd] = useState(false);
+  const [flagged, setFlagged] = useState(() => resumeOffer?.flagged || {});
+  const [eliminated, setEliminated] = useState(() => resumeOffer?.eliminated || {});
+  const [showNav, setShowNav] = useState(false);
+
+  // Clear resume offer after initial load
+  useEffect(() => { if (resumeOffer) setResumeOffer(null); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const currentQuestion = questions[index] || null;
   const review = currentQuestion ? submitted[currentQuestion.id] : null;
@@ -109,6 +146,24 @@ export default function SessionRunner({
     return undefined;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [secondsElapsed, timeLimitSeconds]);
+
+  // Auto-save session state every 5 seconds for crash recovery
+  useEffect(() => {
+    const interval = setInterval(() => {
+      saveSessionState({
+        questionIds,
+        index,
+        answers,
+        submitted,
+        sessionStart,
+        secondsElapsed,
+        flagged,
+        eliminated,
+        savedAt: Date.now(),
+      });
+    }, 5000);
+    return () => clearInterval(interval);
+  }, [questionIds, index, answers, submitted, sessionStart, secondsElapsed, flagged, eliminated]);
 
   const remainingSeconds = useMemo(() => {
     if (!timeLimitSeconds) return null;
@@ -202,6 +257,23 @@ export default function SessionRunner({
     if (!currentQuestion) return;
     setCurrentInput(answers[currentQuestion.id] ?? '');
   }, [currentQuestion, answers]);
+
+  function navigateToQuestion(targetIndex) {
+    if (targetIndex < 0 || targetIndex >= questions.length) return;
+    setIndex(targetIndex);
+    setQuestionStart(Date.now());
+    setShowNav(false);
+  }
+
+  function toggleFlag() {
+    if (!currentQuestion) return;
+    setFlagged((prev) => ({ ...prev, [currentQuestion.id]: !prev[currentQuestion.id] }));
+  }
+
+  function toggleElimination(questionId, choiceIndex) {
+    const key = `${questionId}-${choiceIndex}`;
+    setEliminated((prev) => ({ ...prev, [key]: !prev[key] }));
+  }
 
   function advanceSocraticPrompt() {
     if (!currentQuestion) return;
@@ -300,6 +372,7 @@ export default function SessionRunner({
 
   async function finalizeSession() {
     if (sessionBusy) return;
+    clearSessionState();
     setSessionBusy(persistApi);
 
     const submittedEntries = Object.entries(submitted);
@@ -446,8 +519,27 @@ export default function SessionRunner({
           <span className={timeLimitSeconds && remainingSeconds < 180 ? 'is-danger' : ''}>
             {timeLimitSeconds ? `Time ${formatTimer(remainingSeconds)}` : `Elapsed ${formatTimer(secondsElapsed)}`}
           </span>
+          <button type="button" className="sat-btn sat-btn--ghost" style={{ padding: '4px 10px', fontSize: 12 }} onClick={() => setShowNav(!showNav)}>
+            {showNav ? 'Hide' : 'Nav'}
+          </button>
         </div>
       </header>
+
+      {showNav ? (
+        <div className="sat-q-nav" role="navigation" aria-label="Question navigator">
+          {questions.map((q, i) => {
+            let cls = 'sat-q-nav__btn';
+            if (i === index) cls += ' is-current';
+            if (submitted[q.id]) cls += ' is-answered';
+            if (flagged[q.id]) cls += ' is-flagged';
+            return (
+              <button key={q.id} type="button" className={cls} onClick={() => navigateToQuestion(i)} aria-label={`Question ${i + 1}${flagged[q.id] ? ' (flagged)' : ''}${submitted[q.id] ? ' (answered)' : ''}`}>
+                {i + 1}
+              </button>
+            );
+          })}
+        </div>
+      ) : null}
 
       {timeLimitSeconds ? (() => {
         const expectedProgress = secondsElapsed / timeLimitSeconds;
@@ -509,21 +601,34 @@ export default function SessionRunner({
               const checked = String(currentInput) === String(choiceIndex);
               const isCorrectChoice = review && Number(currentQuestion.answer_key) === choiceIndex;
               const isWrongPick = review && checked && !review.isCorrect;
+              const isEliminated = !review && eliminated[`${currentQuestion.id}-${choiceIndex}`];
               let choiceClass = 'sat-choice';
               if (!review && checked) choiceClass += ' is-selected';
               if (isCorrectChoice) choiceClass += ' is-correct-choice';
               if (isWrongPick) choiceClass += ' is-wrong-choice';
+              if (isEliminated) choiceClass += ' is-eliminated';
               return (
-                <button
-                  key={`${currentQuestion.id}-choice-${choiceIndex}`}
-                  className={choiceClass}
-                  type="button"
-                  onClick={() => setCurrentInput(String(choiceIndex))}
-                  disabled={!!review}
-                >
-                  <span className="sat-choice__letter">{String.fromCharCode(65 + choiceIndex)}</span>
-                  <span>{choice}</span>
-                </button>
+                <div key={`${currentQuestion.id}-choice-${choiceIndex}`} style={{ position: 'relative' }}>
+                  <button
+                    className={choiceClass}
+                    type="button"
+                    onClick={() => setCurrentInput(String(choiceIndex))}
+                    disabled={!!review}
+                  >
+                    <span className="sat-choice__letter">{String.fromCharCode(65 + choiceIndex)}</span>
+                    <span>{choice}</span>
+                  </button>
+                  {!review ? (
+                    <button
+                      type="button"
+                      className="sat-choice__elim"
+                      onClick={(e) => { e.stopPropagation(); toggleElimination(currentQuestion.id, choiceIndex); }}
+                      aria-label={isEliminated ? `Restore choice ${String.fromCharCode(65 + choiceIndex)}` : `Eliminate choice ${String.fromCharCode(65 + choiceIndex)}`}
+                    >
+                      {isEliminated ? '\u21A9' : '\u2715'}
+                    </button>
+                  ) : null}
+                </div>
               );
             })}
           </div>
@@ -549,13 +654,22 @@ export default function SessionRunner({
               {index + 1 >= questions.length ? 'Finish Session' : 'Next Question'}
             </button>
           )}
+          <button
+            className={`sat-btn sat-btn--ghost${flagged[currentQuestion.id] ? ' is-flagged' : ''}`}
+            onClick={toggleFlag}
+            type="button"
+            aria-pressed={!!flagged[currentQuestion.id]}
+            title="Flag this question for review"
+          >
+            {flagged[currentQuestion.id] ? '\u2691 Flagged' : '\u2690 Flag'}
+          </button>
           {!confirmEnd ? (
             <button className="sat-btn sat-btn--ghost" onClick={() => setConfirmEnd(true)} type="button" disabled={sessionBusy}>
               End Session
             </button>
           ) : (
             <>
-              <button className="sat-btn sat-btn--ghost" style={{ borderColor: 'var(--sat-danger)', color: 'var(--sat-danger)' }} onClick={finalizeSession} type="button" disabled={sessionBusy}>
+              <button className="sat-btn sat-btn--danger" onClick={finalizeSession} type="button" disabled={sessionBusy}>
                 Confirm End ({questions.length - Object.keys(submitted).length} unanswered)
               </button>
               <button className="sat-btn sat-btn--ghost" onClick={() => setConfirmEnd(false)} type="button">

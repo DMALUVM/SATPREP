@@ -144,11 +144,19 @@ export default function SatPrepApp() {
     navigate('/');
   }
 
+  // Auto-clear errors after 8 seconds
+  useEffect(() => {
+    if (!error) return undefined;
+    const timer = setTimeout(() => setError(''), 8000);
+    return () => clearTimeout(timer);
+  }, [error]);
+
   if (loading) {
     return (
       <main className="sat-auth">
-        <section className="sat-auth__panel">
-          <h1>Loading SAT Prep...</h1>
+        <section className="sat-auth__panel" style={{ textAlign: 'center' }}>
+          <div className="sat-loader" aria-label="Loading" />
+          <h1 style={{ marginTop: 16 }}>Loading SAT Prep</h1>
         </section>
       </main>
     );
@@ -210,7 +218,12 @@ export default function SatPrepApp() {
             Showing cached progress snapshot while offline.
           </div>
         ) : null}
-        {loadingProgress ? <div className="sat-alert">Refreshing progress…</div> : null}
+        {loadingProgress ? (
+          <div className="sat-alert" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <div className="sat-loader sat-loader--sm" aria-hidden="true" />
+            Refreshing progress…
+          </div>
+        ) : null}
         {error ? <div className="sat-alert sat-alert--danger">{error}</div> : null}
         {renderPage()}
       </main>

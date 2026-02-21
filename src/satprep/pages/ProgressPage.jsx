@@ -12,8 +12,12 @@ export default function ProgressPage({ progress, userId }) {
   if (!metrics) {
     return (
       <section className="sat-panel">
-        <h2>Progress</h2>
-        <p>Run at least one diagnostic or practice session to populate analytics.</p>
+        <h2>Progress Analytics</h2>
+        <div className="sat-empty-state">
+          <div className="sat-empty-state__icon" aria-hidden="true">&#x1F4CA;</div>
+          <h3>No data yet</h3>
+          <p>Run your first Diagnostic or Practice session to unlock score predictions, skill breakdowns, and pace tracking.</p>
+        </div>
       </section>
     );
   }

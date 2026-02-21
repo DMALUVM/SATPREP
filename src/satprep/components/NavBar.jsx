@@ -29,28 +29,30 @@ export default function NavBar({ route, navigate, role, onSignOut }) {
 
   return (
     <header className="sat-nav">
-      <div className="sat-nav__brand" onClick={() => handleNav('/daily')}>
+      <button className="sat-nav__brand" type="button" onClick={() => handleNav('/daily')} aria-label="Go to Daily Mission">
         <span className="sat-nav__badge">SAT</span>
         <div>
           <div className="sat-nav__title">Math + Verbal 1300+</div>
           <div className="sat-nav__subtitle">4-week mission</div>
         </div>
-      </div>
+      </button>
       <button
         className="sat-nav__hamburger"
         type="button"
         onClick={() => setMenuOpen(!menuOpen)}
-        aria-label="Toggle navigation menu"
+        aria-label={menuOpen ? 'Close navigation menu' : 'Open navigation menu'}
+        aria-expanded={menuOpen}
       >
         {menuOpen ? '\u2715' : '\u2630'}
       </button>
-      <nav className={`sat-nav__links ${menuOpen ? 'is-open' : ''}`}>
+      <nav className={`sat-nav__links ${menuOpen ? 'is-open' : ''}`} role="navigation" aria-label="Main navigation">
         {links.map(([path, label]) => (
           <button
             key={path}
             className={`sat-nav__link ${isActive(path) ? 'is-active' : ''}`}
             onClick={() => handleNav(path)}
             type="button"
+            aria-current={isActive(path) ? 'page' : undefined}
           >
             {label}
           </button>
