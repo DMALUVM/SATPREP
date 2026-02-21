@@ -1,18 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { getSupabaseBrowserClient } from '../lib/supabaseBrowser';
-
-const WEEK_PLAN_4 = [
-  ['Week 1 (Foundation)', 'Diagnostic, core algebra cleanup, error pattern detection.'],
-  ['Week 2 (Acceleration)', 'Weak-skill drills + medium/hard progression and pacing discipline.'],
-  ['Week 3 (Pressure)', 'More timed mixed sets, faster decisions, fewer stalls.'],
-  ['Week 4 (Peak)', 'Simulation + targeted cleanup + confidence execution.'],
-];
-
-const WEEK_PLAN_3 = [
-  ['Week 1 (Foundation + Acceleration)', 'Diagnostic on Day 1, core cleanup, then immediately into weak-skill drills and pacing.'],
-  ['Week 2 (Pressure)', 'Timed mixed sets, faster decisions, medium-hard progression under clock.'],
-  ['Week 3 (Peak)', 'Full simulations, error loop tightening, and confidence execution.'],
-];
+import { SAT_PLAN_PHASES, SAT_PLAN_TOTAL_DAYS, SAT_TEST_DATE, diffDays, friendlyDate, setPlanDates, toDateKey } from '../lib/time';
 
 const DAILY_SEQUENCE = [
   ['Warm-up (8-10 min)', 'Rework yesterday\'s misses and explain each fix out loud.'],
@@ -83,8 +71,8 @@ export default function OnboardingPage({ profile, onComplete, navigate }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
-  const [planWeeks, setPlanWeeks] = useState(
-    Number(profile?.settings?.plan_weeks || 4)
+  const [testDate, setTestDate] = useState(
+    profile?.sat_test_date || profile?.settings?.sat_test_date || SAT_TEST_DATE || '2026-03-11'
   );
   const [targetMinutes, setTargetMinutes] = useState(
     Number(profile?.settings?.daily_target_minutes || 55)
@@ -92,6 +80,14 @@ export default function OnboardingPage({ profile, onComplete, navigate }) {
   const [daysPerWeek, setDaysPerWeek] = useState(
     Number(profile?.settings?.days_per_week_goal || 6)
   );
+
+  const planInfo = useMemo(() => {
+    const startDate = profile?.sat_start_date || toDateKey();
+    const days = Math.max(1, diffDays(startDate, testDate));
+    // Temporarily compute phases for this test date to show in onboarding
+    setPlanDates(startDate, testDate);
+    return { totalDays: days, phases: [...SAT_PLAN_PHASES], testDateFriendly: friendlyDate(testDate) };
+  }, [testDate, profile?.sat_start_date]);
 
   const estWeeklyMinutes = useMemo(
     () => Math.max(1, targetMinutes) * Math.max(1, daysPerWeek),
@@ -106,7 +102,7 @@ export default function OnboardingPage({ profile, onComplete, navigate }) {
       const supabase = getSupabaseBrowserClient();
       const settings = {
         ...(profile?.settings || {}),
-        plan_weeks: [3, 4].includes(Number(planWeeks)) ? Number(planWeeks) : 4,
+        sat_test_date: testDate,
         daily_target_minutes: Math.max(30, Math.min(120, Number(targetMinutes) || 55)),
         days_per_week_goal: Math.max(4, Math.min(7, Number(daysPerWeek) || 6)),
         onboarding_complete: true,
@@ -117,6 +113,7 @@ export default function OnboardingPage({ profile, onComplete, navigate }) {
         .from('sat_profiles')
         .update({
           settings,
+          sat_test_date: testDate,
           updated_at: new Date().toISOString(),
         })
         .eq('user_id', profile.user_id)
@@ -142,12 +139,16 @@ export default function OnboardingPage({ profile, onComplete, navigate }) {
         based on weak skills and timing data.
       </p>
 
+      <div className="sat-alert" style={{ marginTop: 14 }}>
+        <strong>Test date:</strong> {planInfo.testDateFriendly} {'\u2022'} <strong>{planInfo.totalDays} days</strong> of prep {'\u2022'} {planInfo.phases.length} phase{planInfo.phases.length !== 1 ? 's' : ''}
+      </div>
+
       <div className="sat-grid-2" style={{ marginTop: 14 }}>
         <article className="sat-task-card">
-          <h3>{planWeeks}-Week Roadmap</h3>
+          <h3>Your {planInfo.totalDays}-Day Roadmap</h3>
           <ol className="sat-list">
-            {(planWeeks === 3 ? WEEK_PLAN_3 : WEEK_PLAN_4).map(([label, desc]) => (
-              <li key={label}><strong>{label}:</strong> {desc}</li>
+            {planInfo.phases.map((phase) => (
+              <li key={phase.name}><strong>{phase.name} (Days {phase.startDay}-{phase.endDay}):</strong> {phase.focus}</li>
             ))}
           </ol>
         </article>
@@ -235,11 +236,13 @@ export default function OnboardingPage({ profile, onComplete, navigate }) {
 
       <div className="sat-grid-form" style={{ marginTop: 14 }}>
         <label>
-          Plan duration
-          <select value={planWeeks} onChange={(event) => setPlanWeeks(Number(event.target.value))}>
-            <option value={3}>3 weeks</option>
-            <option value={4}>4 weeks</option>
-          </select>
+          SAT Test Date
+          <input
+            type="date"
+            value={testDate}
+            onChange={(event) => setTestDate(event.target.value)}
+            min={toDateKey()}
+          />
         </label>
         <label>
           Daily target minutes

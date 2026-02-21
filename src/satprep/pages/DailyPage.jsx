@@ -6,7 +6,7 @@ import SessionSummary from '../components/SessionSummary';
 import { generateDailyMission } from '../lib/apiClient';
 import { getQuestionById } from '../lib/selection';
 import { getDueReviewIds, getReviewStats } from '../lib/spacedRepetition';
-import { friendlyDate, getPlanDay, getWeekForDay, SAT_PLAN_WEEKS, toDateKey } from '../lib/time';
+import { friendlyDate, getPhaseForDay, getPlanDay, SAT_PLAN_TOTAL_DAYS, SAT_TEST_DATE, toDateKey } from '../lib/time';
 
 const COACH_PLAYBOOK = {
   'linear-equations': [
@@ -120,8 +120,7 @@ function DailyProjection() {
 
       const today = toDateKey();
       const planDay = getPlanDay(today);
-      const totalPlanDays = SAT_PLAN_WEEKS * 7;
-      const daysRemaining = Math.max(0, totalPlanDays - planDay);
+      const daysRemaining = Math.max(0, SAT_PLAN_TOTAL_DAYS - planDay);
 
       const totalCorrect = history.reduce((s, h) => s + (h.correctCount || 0), 0);
       const totalAttempts = history.reduce((s, h) => s + (h.totalCount || 0), 0);
@@ -187,23 +186,14 @@ export default function DailyPage({ onRefreshProgress, progressMetrics, navigate
 
   const today = toDateKey();
   const planDay = getPlanDay(today);
-  const planWeek = getWeekForDay(planDay);
+  const currentPhase = getPhaseForDay(planDay);
   const missionMinutes = mission?.target_minutes || 55;
   const weakSkillRows = (progressMetrics?.weak_skills || []).slice(0, 3).map(buildSkillActionRow);
   const hasDiagnostic = (progressMetrics?.totals?.attempts || 0) > 0;
-  const weekFocus = SAT_PLAN_WEEKS === 3
-    ? (planWeek === 1
-        ? 'Week 1 Foundation + Acceleration: diagnostic, core cleanup, weak-skill drills, and pacing.'
-        : planWeek === 2
-          ? 'Week 2 Pressure: timed mixed sets, faster decisions, medium-hard progression.'
-          : 'Week 3 Peak: full simulations, error loop tightening, and confidence execution.')
-    : (planWeek === 1
-        ? 'Week 1 Foundation: equations, graphing, systems, and clean setup.'
-        : planWeek === 2
-          ? 'Week 2 Core Skills: percentages, statistics, quadratics, and function fluency.'
-          : planWeek === 3
-            ? 'Week 3 Level-Up: medium-hard mixed sets under time pressure.'
-            : 'Week 4 Peak Mode: full simulations, error loop tightening, and confidence execution.');
+  const daysLeft = Math.max(0, SAT_PLAN_TOTAL_DAYS - planDay);
+  const phaseFocus = currentPhase
+    ? `${currentPhase.name} Phase (Days ${currentPhase.startDay}-${currentPhase.endDay}): ${currentPhase.focus}`
+    : 'Follow your daily mission and focus on weak skills.';
 
   const missionQuestionList = useMemo(() => {
     if (!mission) return [];
@@ -293,7 +283,7 @@ export default function DailyPage({ onRefreshProgress, progressMetrics, navigate
         <AiStatusBadge />
       </div>
       <p>
-        {friendlyDate(today)} {'\u2022'} Day {planDay} of {SAT_PLAN_WEEKS * 7} {'\u2022'} Week {planWeek}
+        {friendlyDate(today)} {'\u2022'} Day {planDay} of {SAT_PLAN_TOTAL_DAYS} {'\u2022'} {daysLeft} day{daysLeft !== 1 ? 's' : ''} to test ({friendlyDate(SAT_TEST_DATE)})
       </p>
 
       <SpacedReviewBanner today={today} onStartReview={(ids) => {
@@ -312,7 +302,7 @@ export default function DailyPage({ onRefreshProgress, progressMetrics, navigate
         navigate={navigate}
       />
 
-      <div className="sat-alert">{weekFocus}</div>
+      <div className="sat-alert">{phaseFocus}</div>
 
       <DailyProjection />
 

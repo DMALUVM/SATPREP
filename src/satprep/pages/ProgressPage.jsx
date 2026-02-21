@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import StatCard from '../components/StatCard';
 import { getReviewStats } from '../lib/spacedRepetition';
-import { SAT_PLAN_END_DATE, SAT_PLAN_WEEKS, getPlanDay, toDateKey } from '../lib/time';
+import { SAT_PLAN_TOTAL_DAYS, SAT_TEST_DATE, getPlanDay, toDateKey } from '../lib/time';
 
 function combinedScoreTone(score) {
   if (score >= 1300) return 'success';
@@ -18,8 +18,7 @@ function ScoreProjection({ metrics }) {
 
       const today = toDateKey();
       const planDay = getPlanDay(today);
-      const totalPlanDays = SAT_PLAN_WEEKS * 7;
-      const daysRemaining = Math.max(0, totalPlanDays - planDay);
+      const daysRemaining = Math.max(0, SAT_PLAN_TOTAL_DAYS - planDay);
 
       // Group sessions by date and compute daily accuracy
       const byDate = {};
@@ -74,7 +73,7 @@ function ScoreProjection({ metrics }) {
 
       return {
         daysRemaining,
-        testDate: SAT_PLAN_END_DATE,
+        testDate: SAT_TEST_DATE,
         currentCombined,
         projectedCombined,
         currentMathScore,

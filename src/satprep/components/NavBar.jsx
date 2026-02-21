@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { SAT_PLAN_WEEKS } from '../lib/time';
+import { SAT_PLAN_TOTAL_DAYS, SAT_TEST_DATE, getPlanDay, toDateKey } from '../lib/time';
 
 const STUDENT_LINKS = [
   ['/daily', 'Daily'],
@@ -34,7 +34,7 @@ export default function NavBar({ route, navigate, role, onSignOut }) {
         <span className="sat-nav__badge">SAT</span>
         <div>
           <div className="sat-nav__title">Math + Verbal 1300+</div>
-          <div className="sat-nav__subtitle">{SAT_PLAN_WEEKS}-week mission</div>
+          <div className="sat-nav__subtitle">{Math.max(0, SAT_PLAN_TOTAL_DAYS - getPlanDay(toDateKey()))} days to test</div>
         </div>
       </button>
       <button

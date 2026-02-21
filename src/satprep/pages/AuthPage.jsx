@@ -202,7 +202,7 @@ export default function AuthPage() {
         {error ? <div className="sat-alert sat-alert--danger">{error}</div> : null}
 
         <ul className="sat-auth__list">
-          <li>Plan start date: Sunday, February 22, 2026</li>
+          <li>Your plan adapts to your test date automatically</li>
           <li>Daily target: 45-60 focused minutes</li>
           <li>Math target: 650-700</li>
           <li>Verbal target: 680-720</li>
