@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo, useState } from 'react';
 import StatCard from '../components/StatCard';
 
 function combinedScoreTone(score) {
@@ -142,6 +142,82 @@ export default function ProgressPage({ progress, userId }) {
           </table>
         </div>
       ) : null}
+
+      <SessionHistory />
     </section>
+  );
+}
+
+function SessionHistory() {
+  const [expandedId, setExpandedId] = useState(null);
+  const history = useMemo(() => {
+    try {
+      const raw = window.localStorage.getItem('satprep.sessionHistory.v1');
+      return raw ? JSON.parse(raw).reverse().slice(0, 20) : [];
+    } catch {
+      return [];
+    }
+  }, []);
+
+  if (!history.length) return null;
+
+  function formatDate(iso) {
+    return new Date(iso).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+  }
+
+  return (
+    <div className="sat-table-wrap" style={{ marginTop: 18 }}>
+      <h3>Session History</h3>
+      <table className="sat-table">
+        <thead>
+          <tr>
+            <th>Date</th>
+            <th>Mode</th>
+            <th>Score</th>
+            <th>Accuracy</th>
+            <th>Pace</th>
+            <th>Missed</th>
+          </tr>
+        </thead>
+        <tbody>
+          {history.map((session) => (
+            <React.Fragment key={session.id}>
+              <tr
+                style={{ cursor: session.missedQuestions?.length ? 'pointer' : 'default' }}
+                onClick={() => session.missedQuestions?.length && setExpandedId(expandedId === session.id ? null : session.id)}
+              >
+                <td>{formatDate(session.date)}</td>
+                <td>{session.mode}</td>
+                <td>{session.correctCount}/{session.totalCount}</td>
+                <td>{session.accuracyPct}%</td>
+                <td>{session.avgSeconds}s</td>
+                <td style={{ color: session.missedQuestions?.length ? 'var(--sat-danger)' : 'var(--sat-success)' }}>
+                  {session.missedQuestions?.length || 0}
+                  {session.missedQuestions?.length ? ' (click)' : ''}
+                </td>
+              </tr>
+              {expandedId === session.id && session.missedQuestions?.length ? (
+                <tr>
+                  <td colSpan="6" style={{ padding: 0 }}>
+                    <div style={{ padding: '10px 12px', background: 'rgba(180, 35, 24, 0.04)' }}>
+                      <strong>Missed Questions:</strong>
+                      {session.missedQuestions.map((q, i) => (
+                        <div key={q.id || i} className="sat-journal__entry" style={{ marginTop: 6 }}>
+                          <div className="sat-journal__entry-header">
+                            <span className="sat-pill sat-pill--neutral">{q.skill}</span>
+                            <span className="sat-muted">Diff {q.difficulty} | {q.secondsSpent}s</span>
+                          </div>
+                          <p style={{ margin: '4px 0', fontSize: 14 }}>{q.stem}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </td>
+                </tr>
+              ) : null}
+            </React.Fragment>
+          ))}
+        </tbody>
+      </table>
+    </div>
   );
 }

@@ -167,7 +167,7 @@ export default function SatPrepApp() {
 
   function renderPage() {
     if (route === '/daily' || route === '/') {
-      return <DailyPage onRefreshProgress={refreshProgress} progressMetrics={progress?.metrics} />;
+      return <DailyPage onRefreshProgress={refreshProgress} progressMetrics={progress?.metrics} navigate={navigate} />;
     }
     if (route === '/onboarding') {
       return (

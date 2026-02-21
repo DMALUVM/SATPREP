@@ -22,6 +22,11 @@ export default function NavBar({ route, navigate, role, onSignOut }) {
     setMenuOpen(false);
   }
 
+  function isActive(path) {
+    if (path === '/daily') return route === '/daily' || route === '/';
+    return route === path;
+  }
+
   return (
     <header className="sat-nav">
       <div className="sat-nav__brand" onClick={() => handleNav('/daily')}>
@@ -43,17 +48,20 @@ export default function NavBar({ route, navigate, role, onSignOut }) {
         {links.map(([path, label]) => (
           <button
             key={path}
-            className={`sat-nav__link ${route.startsWith(path) ? 'is-active' : ''}`}
+            className={`sat-nav__link ${isActive(path) ? 'is-active' : ''}`}
             onClick={() => handleNav(path)}
             type="button"
           >
             {label}
           </button>
         ))}
-        <button className="sat-nav__signout" onClick={onSignOut} type="button">
+        <button className="sat-nav__signout sat-nav__signout--mobile" onClick={onSignOut} type="button">
           Sign out
         </button>
       </nav>
+      <button className="sat-nav__signout sat-nav__signout--desktop" onClick={onSignOut} type="button">
+        Sign out
+      </button>
     </header>
   );
 }

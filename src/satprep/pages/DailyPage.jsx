@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from 'react';
+import MistakeJournal from '../components/MistakeJournal';
 import SessionRunner from '../components/SessionRunner';
 import SessionSummary from '../components/SessionSummary';
 import { generateDailyMission } from '../lib/apiClient';
@@ -108,7 +109,7 @@ function NextStepBanner({ hasDiagnostic, mission, missionQuestionCount, summary,
   );
 }
 
-export default function DailyPage({ onRefreshProgress, progressMetrics }) {
+export default function DailyPage({ onRefreshProgress, progressMetrics, navigate }) {
   const [mission, setMission] = useState(null);
   const [missionMeta, setMissionMeta] = useState(null);
   const [missionQuestions, setMissionQuestions] = useState([]);
@@ -193,7 +194,7 @@ export default function DailyPage({ onRefreshProgress, progressMetrics }) {
     <section className="sat-panel">
       <h2>Daily Mission Console</h2>
       <p>
-        {friendlyDate(today)} &bull; Day {planDay} of 28 &bull; Week {planWeek}
+        {friendlyDate(today)} {'\u2022'} Day {planDay} of 28 {'\u2022'} Week {planWeek}
       </p>
 
       <NextStepBanner
@@ -201,10 +202,7 @@ export default function DailyPage({ onRefreshProgress, progressMetrics }) {
         mission={mission}
         missionQuestionCount={missionQuestionList.length}
         summary={summary}
-        navigate={(path) => {
-          window.history.pushState(null, '', `/sat-prep${path}`);
-          window.dispatchEvent(new PopStateEvent('popstate'));
-        }}
+        navigate={navigate}
       />
 
       <div className="sat-alert">{weekFocus}</div>
@@ -303,6 +301,8 @@ export default function DailyPage({ onRefreshProgress, progressMetrics }) {
       {summary ? (
         <SessionSummary summary={summary} onDismiss={() => setSummary(null)} />
       ) : null}
+
+      <MistakeJournal />
     </section>
   );
 }
