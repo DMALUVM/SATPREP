@@ -13,6 +13,7 @@ import ProgressPage from './pages/ProgressPage';
 import ReviewPage from './pages/ReviewPage';
 import TimedPage from './pages/TimedPage';
 import VerbalPage from './pages/VerbalPage';
+import OnboardingPage from './pages/OnboardingPage';
 import './styles/satprep.css';
 
 function NotFoundPage() {
@@ -32,6 +33,8 @@ export default function SatPrepApp() {
   const [loading, setLoading] = useState(true);
   const [loadingProgress, setLoadingProgress] = useState(false);
   const [error, setError] = useState('');
+
+  const onboardingComplete = !!profile?.settings?.onboarding_complete;
 
   useEffect(() => {
     const supabase = getSupabaseBrowserClient();
@@ -116,9 +119,17 @@ export default function SatPrepApp() {
   useEffect(() => {
     if (!profile) return;
     if (route === '/') {
-      navigate(profile.role === 'parent' ? '/parent' : '/daily');
+      if (profile.role === 'parent') {
+        navigate('/parent');
+        return;
+      }
+      navigate(onboardingComplete ? '/daily' : '/onboarding');
+      return;
     }
-  }, [route, navigate, profile]);
+    if (profile.role !== 'parent' && !onboardingComplete && route !== '/onboarding') {
+      navigate('/onboarding');
+    }
+  }, [route, navigate, profile, onboardingComplete]);
 
   async function handleSignOut() {
     const supabase = getSupabaseBrowserClient();
@@ -149,6 +160,17 @@ export default function SatPrepApp() {
   function renderPage() {
     if (route === '/daily' || route === '/') {
       return <DailyPage onRefreshProgress={refreshProgress} progressMetrics={progress?.metrics} />;
+    }
+    if (route === '/onboarding') {
+      return (
+        <OnboardingPage
+          profile={profile}
+          navigate={navigate}
+          onComplete={(nextProfile) => {
+            if (nextProfile) setProfile(nextProfile);
+          }}
+        />
+      );
     }
     if (route === '/diagnostic') return <DiagnosticPage onRefreshProgress={refreshProgress} />;
     if (route === '/practice') {

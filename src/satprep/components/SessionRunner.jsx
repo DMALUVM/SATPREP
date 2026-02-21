@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { completeSession, submitAttempt } from '../lib/apiClient';
 import { estimateSessionWindow } from '../lib/sessionTime';
+import { toStudentFriendlyMathList, toStudentFriendlyMathText } from '../lib/textFormat';
 
 function normalizeGridAnswer(value) {
   return String(value || '').trim().replace(/\s+/g, '');
@@ -82,6 +83,31 @@ export default function SessionRunner({
     if (plannedTimeLabel) return plannedTimeLabel;
     return estimateSessionWindow({ questions, timeLimitSeconds }).label;
   }, [plannedTimeLabel, questions, timeLimitSeconds]);
+
+  const displayStem = useMemo(
+    () => toStudentFriendlyMathText(currentQuestion?.stem || ''),
+    [currentQuestion]
+  );
+
+  const displayChoices = useMemo(
+    () => toStudentFriendlyMathList(currentQuestion?.choices || []),
+    [currentQuestion]
+  );
+
+  const displaySteps = useMemo(
+    () => toStudentFriendlyMathList(currentQuestion?.explanation_steps || []),
+    [currentQuestion]
+  );
+
+  const displayStrategy = useMemo(
+    () => toStudentFriendlyMathText(currentQuestion?.strategy_tip || ''),
+    [currentQuestion]
+  );
+
+  const displayTrap = useMemo(
+    () => toStudentFriendlyMathText(currentQuestion?.trap_tag || ''),
+    [currentQuestion]
+  );
 
   async function submitCurrentAnswer() {
     if (!currentQuestion || sessionBusy) return;
@@ -266,11 +292,11 @@ export default function SessionRunner({
           <span>{currentQuestion.skill}</span>
           <span>Difficulty {currentQuestion.difficulty}</span>
         </div>
-        <h3 className="sat-question-card__stem">{currentQuestion.stem}</h3>
+        <h3 className="sat-question-card__stem">{displayStem}</h3>
 
         {currentQuestion.format === 'multiple_choice' ? (
           <div className="sat-choice-list">
-            {currentQuestion.choices.map((choice, choiceIndex) => {
+            {displayChoices.map((choice, choiceIndex) => {
               const checked = String(currentInput) === String(choiceIndex);
               return (
                 <button
@@ -328,15 +354,15 @@ export default function SessionRunner({
                   : 'Review the explanation and try again.'}
             </p>
             <ol>
-              {currentQuestion.explanation_steps.map((step) => (
+              {displaySteps.map((step) => (
                 <li key={`${currentQuestion.id}-${step.slice(0, 14)}`}>{step}</li>
               ))}
             </ol>
             <p>
-              <strong>Strategy:</strong> {currentQuestion.strategy_tip}
+              <strong>Strategy:</strong> {displayStrategy}
             </p>
             <p>
-              <strong>Common trap:</strong> {currentQuestion.trap_tag}
+              <strong>Common trap:</strong> {displayTrap}
             </p>
           </div>
         ) : null}

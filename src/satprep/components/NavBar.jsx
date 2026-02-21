@@ -1,6 +1,7 @@
 import React from 'react';
 
 const STUDENT_LINKS = [
+  ['/onboarding', 'Start Here'],
   ['/daily', 'Daily'],
   ['/diagnostic', 'Diagnostic'],
   ['/practice', 'Practice'],
