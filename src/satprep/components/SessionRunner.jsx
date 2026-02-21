@@ -768,6 +768,18 @@ export default function SessionRunner({
           >
             {flagged[currentQuestion.id] ? '\u2691 Flagged' : '\u2690 Flag'}
           </button>
+          <button
+            className="sat-btn sat-btn--ghost"
+            type="button"
+            disabled={sessionBusy}
+            onClick={() => {
+              const s = stateRef.current;
+              saveSessionState({ ...s, savedAt: Date.now() });
+              onExit?.();
+            }}
+          >
+            Pause
+          </button>
           {!confirmEnd ? (
             <button className="sat-btn sat-btn--ghost" onClick={() => setConfirmEnd(true)} type="button" disabled={sessionBusy}>
               End Session

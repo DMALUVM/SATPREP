@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import AiStatusBadge from '../components/AiStatusBadge';
 import MistakeJournal from '../components/MistakeJournal';
 import SessionRunner from '../components/SessionRunner';
@@ -242,6 +242,30 @@ function SpacedReviewBanner({ today, onStartReview }) {
   );
 }
 
+const MISSION_SAVE_KEY = 'satprep.dailyMission.v1';
+
+function saveMissionState(data) {
+  try {
+    window.localStorage.setItem(MISSION_SAVE_KEY, JSON.stringify({ ...data, savedAt: Date.now() }));
+  } catch { /* ignore */ }
+}
+
+function loadMissionState(today) {
+  try {
+    const raw = window.localStorage.getItem(MISSION_SAVE_KEY);
+    if (!raw) return null;
+    const saved = JSON.parse(raw);
+    // Only restore if it's for today and less than 12 hours old
+    if (saved.planDate !== today) return null;
+    if (Date.now() - saved.savedAt > 12 * 60 * 60 * 1000) return null;
+    return saved;
+  } catch { return null; }
+}
+
+function clearMissionState() {
+  try { window.localStorage.removeItem(MISSION_SAVE_KEY); } catch { /* ignore */ }
+}
+
 const INTENSITY_OPTIONS = [
   { key: 'light', label: 'Light', minutes: 30, description: '~11 questions' },
   { key: 'standard', label: 'Standard', minutes: 55, description: '~20 questions' },
@@ -249,6 +273,8 @@ const INTENSITY_OPTIONS = [
 ];
 
 export default function DailyPage({ onRefreshProgress, progressMetrics, navigate, profile, onUpdateProfile }) {
+  const today = toDateKey();
+
   const [mission, setMission] = useState(null);
   const [missionMeta, setMissionMeta] = useState(null);
   const [missionQuestions, setMissionQuestions] = useState([]);
@@ -260,7 +286,17 @@ export default function DailyPage({ onRefreshProgress, progressMetrics, navigate
   const [reviewQuestions, setReviewQuestions] = useState(null);
   const [intensity, setIntensity] = useState('standard');
 
-  const today = toDateKey();
+  // Restore saved mission on mount (e.g., after pause or page reload)
+  useEffect(() => {
+    const saved = loadMissionState(today);
+    if (saved?.mission) {
+      setMission(saved.mission);
+      setMissionMeta(saved.missionMeta || null);
+      setMissionQuestions(saved.missionQuestions || []);
+      setMissionOffline(Boolean(saved.offline));
+      if (saved.intensity) setIntensity(saved.intensity);
+    }
+  }, [today]);
   const planDay = getPlanDay(today);
   const currentPhase = getPhaseForDay(planDay);
   const missionMinutes = mission?.target_minutes || 55;
@@ -287,6 +323,19 @@ export default function DailyPage({ onRefreshProgress, progressMetrics, navigate
 
   const selectedIntensity = INTENSITY_OPTIONS.find((o) => o.key === intensity) || INTENSITY_OPTIONS[1];
 
+  // Check if there's a paused session waiting to resume
+  const hasPausedSession = useMemo(() => {
+    try {
+      const raw = window.localStorage.getItem('satprep.activeSession.v1');
+      if (!raw) return false;
+      const saved = JSON.parse(raw);
+      if (Date.now() - saved.savedAt > 12 * 60 * 60 * 1000) return false;
+      // Check if question IDs match the current mission
+      const missionIds = (mission?.tasks || []).flatMap((t) => t.question_ids || []).join(',');
+      return missionIds && saved.questionIds?.join(',') === missionIds;
+    } catch { return false; }
+  }, [mission]);
+
   async function fetchMission() {
     setBusy(true);
     setError('');
@@ -297,6 +346,15 @@ export default function DailyPage({ onRefreshProgress, progressMetrics, navigate
       setMissionQuestions(data.questions || []);
       setMissionOffline(Boolean(data.offline));
       setSummary(null);
+      // Persist so the mission survives page reload / pause
+      saveMissionState({
+        planDate: today,
+        mission: data.mission,
+        missionMeta: data.mission_metadata || null,
+        missionQuestions: data.questions || [],
+        offline: Boolean(data.offline),
+        intensity: selectedIntensity.key,
+      });
     } catch (err) {
       setError(err.message || 'Failed to generate mission');
     } finally {
@@ -348,6 +406,7 @@ export default function DailyPage({ onRefreshProgress, progressMetrics, navigate
         onFinish={(result) => {
           setRunning(false);
           setSummary(result);
+          clearMissionState();
           onRefreshProgress?.();
         }}
       />
@@ -416,7 +475,7 @@ export default function DailyPage({ onRefreshProgress, progressMetrics, navigate
         </button>
         {missionQuestionList.length ? (
           <button type="button" className="sat-btn" onClick={() => setRunning(true)}>
-            Start Mission ({missionQuestionList.length} questions, ~{missionMinutes} min)
+            {hasPausedSession ? 'Resume' : 'Start'} Mission ({missionQuestionList.length} questions, ~{missionMinutes} min)
           </button>
         ) : null}
       </div>
