@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { completeSession, fetchAiExplanation, submitAttempt } from '../lib/apiClient';
 import { buildCoachingPlan } from '../lib/coaching';
 import { getDesmosGuide } from '../lib/desmosGuide';
@@ -22,6 +22,10 @@ function loadSessionState(questionIds) {
     const currentIds = questionIds.join(',');
     if (savedIds !== currentIds) return null;
     if (Date.now() - saved.savedAt > 3 * 60 * 60 * 1000) return null;
+    // Validate saved index is within bounds
+    if (typeof saved.index !== 'number' || saved.index < 0 || saved.index >= questionIds.length) {
+      saved.index = 0;
+    }
     return saved;
   } catch { return null; }
 }
@@ -103,6 +107,11 @@ export default function SessionRunner({
   const [aiExplanations, setAiExplanations] = useState({});
   const [aiLoading, setAiLoading] = useState(false);
   const [aiError, setAiError] = useState('');
+  const [sessionFinalized, setSessionFinalized] = useState(false);
+
+  // Refs for auto-save (avoids re-creating interval on every state change)
+  const stateRef = useRef({ questionIds, index, answers, submitted, sessionStart, secondsElapsed, flagged, eliminated });
+  stateRef.current = { questionIds, index, answers, submitted, sessionStart, secondsElapsed, flagged, eliminated };
 
   // Clear resume offer after initial load
   useEffect(() => { if (resumeOffer) setResumeOffer(null); }, []); // eslint-disable-line react-hooks/exhaustive-deps
@@ -110,9 +119,10 @@ export default function SessionRunner({
   const currentQuestion = questions[index] || null;
   const review = currentQuestion ? submitted[currentQuestion.id] : null;
 
+  // Keyboard handler — uses refs/deps to avoid stale closures
   useEffect(() => {
     function handleKeyDown(e) {
-      if (sessionBusy || !currentQuestion) return;
+      if (sessionBusy || !currentQuestion || sessionFinalized) return;
       if (e.key === 'Enter') {
         e.preventDefault();
         if (review) {
@@ -132,41 +142,47 @@ export default function SessionRunner({
     }
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  });
+  }); // eslint-disable-line react-hooks/exhaustive-deps -- intentionally re-binds every render
 
+  // Timer — stops after finalization
   useEffect(() => {
+    if (sessionFinalized) return undefined;
     const timer = setInterval(() => {
       setSecondsElapsed(Math.floor((Date.now() - sessionStart) / 1000));
     }, 1000);
     return () => clearInterval(timer);
-  }, [sessionStart]);
+  }, [sessionStart, sessionFinalized]);
 
+  // Time-limit auto-finish
   useEffect(() => {
-    if (!timeLimitSeconds) return undefined;
+    if (!timeLimitSeconds || sessionFinalized) return undefined;
     if (secondsElapsed >= timeLimitSeconds) {
       finalizeSession();
     }
     return undefined;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [secondsElapsed, timeLimitSeconds]);
+  }, [secondsElapsed, timeLimitSeconds, sessionFinalized]);
 
-  // Auto-save session state every 5 seconds for crash recovery
+  // Auto-save every 5 seconds (single stable interval via ref)
   useEffect(() => {
+    if (sessionFinalized) return undefined;
     const interval = setInterval(() => {
-      saveSessionState({
-        questionIds,
-        index,
-        answers,
-        submitted,
-        sessionStart,
-        secondsElapsed,
-        flagged,
-        eliminated,
-        savedAt: Date.now(),
-      });
+      const s = stateRef.current;
+      saveSessionState({ ...s, savedAt: Date.now() });
     }, 5000);
     return () => clearInterval(interval);
-  }, [questionIds, index, answers, submitted, sessionStart, secondsElapsed, flagged, eliminated]);
+  }, [sessionFinalized]);
+
+  // Warn before tab close during active session
+  useEffect(() => {
+    if (sessionFinalized) return undefined;
+    function handleBeforeUnload(e) {
+      e.preventDefault();
+      e.returnValue = '';
+    }
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [sessionFinalized]);
 
   const remainingSeconds = useMemo(() => {
     if (!timeLimitSeconds) return null;
@@ -262,7 +278,7 @@ export default function SessionRunner({
   }, [currentQuestion, answers]);
 
   function navigateToQuestion(targetIndex) {
-    if (targetIndex < 0 || targetIndex >= questions.length) return;
+    if (sessionBusy || targetIndex < 0 || targetIndex >= questions.length) return;
     setIndex(targetIndex);
     setQuestionStart(Date.now());
     setShowNav(false);
@@ -328,18 +344,19 @@ export default function SessionRunner({
   }
 
   async function submitCurrentAnswer() {
-    if (!currentQuestion || sessionBusy) return;
+    if (!currentQuestion || sessionBusy || sessionFinalized) return;
 
     const rawAnswer = currentQuestion.format === 'multiple_choice' ? currentInput : normalizeGridAnswer(currentInput);
     if (rawAnswer === '' || rawAnswer === null || rawAnswer === undefined) return;
 
+    // Lock immediately to prevent double-submit / navigate-during-submit
+    setSessionBusy(true);
     setWarning('');
 
     let resolvedCorrect = isAnswerCorrect(currentQuestion, rawAnswer);
     const secondsSpent = Math.max(1, Math.floor((Date.now() - questionStart) / 1000));
 
     if (persistApi) {
-      setSessionBusy(true);
       try {
         const response = await submitAttempt({
           question_id: currentQuestion.id,
@@ -364,8 +381,6 @@ export default function SessionRunner({
           console.warn('submitAttempt failed:', error.message);
           setWarning('Network issue: saved locally for now.');
         }
-      } finally {
-        setSessionBusy(false);
       }
     }
 
@@ -388,6 +403,8 @@ export default function SessionRunner({
       ...prev,
       [currentQuestion.id]: Boolean(resolvedCorrect),
     }));
+
+    setSessionBusy(false);
   }
 
   async function nextQuestion() {
@@ -406,7 +423,8 @@ export default function SessionRunner({
   }
 
   async function finalizeSession() {
-    if (sessionBusy) return;
+    if (sessionBusy || sessionFinalized) return;
+    setSessionFinalized(true);
     clearSessionState();
     setSessionBusy(persistApi);
 
@@ -477,7 +495,8 @@ export default function SessionRunner({
 
     setSessionBusy(false);
 
-    const missedQuestions = submittedEntries
+    // Collect wrong answers + unanswered questions for review
+    const wrongQuestions = submittedEntries
       .filter(([, value]) => !value.isCorrect)
       .map(([questionId, value]) => {
         const q = questions.find((qItem) => qItem.id === questionId);
@@ -494,6 +513,21 @@ export default function SessionRunner({
         };
       })
       .filter(Boolean);
+
+    const unansweredQuestions = questions
+      .filter((q) => !submitted[q.id])
+      .map((q) => ({
+        id: q.id,
+        skill: q.skill,
+        domain: q.domain,
+        difficulty: q.difficulty,
+        stem: String(q.stem || '').slice(0, 200),
+        studentAnswer: null,
+        correctAnswer: q.answer_key,
+        secondsSpent: 0,
+      }));
+
+    const missedQuestions = [...wrongQuestions, ...unansweredQuestions];
 
     const sessionResult = {
       totalCount,
@@ -715,11 +749,11 @@ export default function SessionRunner({
             </>
           )}
           <span className="sat-shortcut-hint">
-            {currentQuestion.format === 'multiple_choice' && !review
-              ? 'Keys: A/B/C/D to select, Enter to submit'
-              : review
-                ? 'Press Enter for next question'
-                : 'Press Enter to submit'}
+            {review
+              ? (index + 1 >= questions.length ? 'Press Enter to finish session' : 'Press Enter for next question')
+              : currentQuestion.format === 'multiple_choice'
+                ? 'Keys: A/B/C/D to select, Enter to submit'
+                : 'Type your answer, then press Enter to submit'}
           </span>
         </div>
 
@@ -768,7 +802,9 @@ export default function SessionRunner({
                         <button className="sat-btn" type="button" onClick={advanceSocraticPrompt}>
                           Next Coach Question
                         </button>
-                      ) : null}
+                      ) : (
+                        <span className="sat-muted">All coach questions answered.</span>
+                      )}
                       <button className="sat-btn sat-btn--ghost" type="button" onClick={revealSolution}>
                         Reveal Full Solution
                       </button>
@@ -777,6 +813,13 @@ export default function SessionRunner({
                 ) : (
                   <p className="sat-muted">Socratic check complete. Use the full walkthrough below.</p>
                 )}
+              </div>
+            ) : shouldGateSolution && !isSolutionRevealed ? (
+              <div className="sat-socratic">
+                <p className="sat-muted">No coach questions available for this type.</p>
+                <button className="sat-btn sat-btn--ghost" type="button" onClick={revealSolution} style={{ marginTop: 6 }}>
+                  Reveal Full Solution
+                </button>
               </div>
             ) : null}
 

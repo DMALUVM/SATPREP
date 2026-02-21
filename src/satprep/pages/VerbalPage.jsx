@@ -4,6 +4,7 @@ import SessionRunner from '../components/SessionRunner';
 import SessionSummary from '../components/SessionSummary';
 import { buildAdaptiveVerbalSet, buildVerbalSet, getVerbalQuestionById, getVerbalStats } from '../content/verbalQuestionBank';
 import { estimateSessionFromConfig } from '../lib/sessionTime';
+import { toDateKey } from '../lib/time';
 
 const STRATEGY_PLAYBOOK = [
   {
@@ -147,6 +148,7 @@ export default function VerbalPage({ progressMetrics, onRefreshProgress }) {
         title={`Review ${reviewQuestions.length} Missed Question${reviewQuestions.length !== 1 ? 's' : ''}`}
         mode="review"
         questions={reviewQuestions}
+        planDate={toDateKey()}
         coachTone="firm-supportive"
         onExit={() => setReviewQuestions(null)}
         onFinish={(result) => {
@@ -164,6 +166,7 @@ export default function VerbalPage({ progressMetrics, onRefreshProgress }) {
         title="Verbal Precision Drill"
         mode="practice"
         questions={runningSet}
+        planDate={toDateKey()}
         timeLimitSeconds={timeLimitSeconds}
         coachTone="firm-supportive"
         onExit={() => setRunningSet(null)}
@@ -278,6 +281,10 @@ export default function VerbalPage({ progressMetrics, onRefreshProgress }) {
                 strongSkills,
               })
               : buildVerbalSet({ section, count, difficulty });
+            if (!set.length) {
+              alert('No verbal questions match your filters. Try adjusting section or difficulty.');
+              return;
+            }
             setRunningSet(set);
           }}
         >

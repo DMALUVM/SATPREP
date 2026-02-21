@@ -63,15 +63,20 @@ export default function MistakeJournal() {
 
   return (
     <div className="sat-journal">
-      <div className="sat-journal__header" onClick={() => setExpanded(!expanded)}>
+      <button
+        type="button"
+        className="sat-journal__header"
+        onClick={() => setExpanded(!expanded)}
+        aria-expanded={expanded}
+      >
         <h3>Mistake Journal</h3>
         <span className="sat-journal__count">
           {todayEntries.length} today / {entries.length} total
         </span>
-        <button type="button" className="sat-btn sat-btn--ghost" style={{ padding: '4px 10px', fontSize: 13 }}>
+        <span className="sat-btn sat-btn--ghost" style={{ padding: '4px 10px', fontSize: 13 }} aria-hidden="true">
           {expanded ? 'Collapse' : 'Expand'}
-        </button>
-      </div>
+        </span>
+      </button>
 
       {!expanded ? (
         <p className="sat-muted" style={{ margin: '8px 0 0' }}>

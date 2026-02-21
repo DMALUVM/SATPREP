@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import ErrorBoundary from './components/ErrorBoundary';
 import NavBar from './components/NavBar';
 import { useSatRoute } from './hooks/useSatRoute';
 import { fetchProgress, getOfflineSyncSnapshot, subscribeOfflineSync } from './lib/apiClient';
@@ -167,7 +168,20 @@ export default function SatPrepApp() {
   }
 
   if (!profile) {
-    return <ProfileSetupPage user={session.user} onComplete={() => window.location.reload()} />;
+    return (
+      <ProfileSetupPage
+        user={session.user}
+        onComplete={async () => {
+          const supabase = getSupabaseBrowserClient();
+          const { data } = await supabase
+            .from('sat_profiles')
+            .select('*')
+            .eq('user_id', session.user.id)
+            .maybeSingle();
+          setProfile(data || null);
+        }}
+      />
+    );
   }
 
   function renderPage() {
@@ -203,6 +217,7 @@ export default function SatPrepApp() {
     <div className="sat-shell">
       <NavBar route={route} navigate={navigate} role={profile.role} onSignOut={handleSignOut} />
       <main className="sat-main">
+       <ErrorBoundary>
         {!syncState.online ? (
           <div className="sat-alert sat-alert--danger">
             Offline mode active: training continues locally. Data will auto-sync when internet returns.
@@ -226,6 +241,7 @@ export default function SatPrepApp() {
         ) : null}
         {error ? <div className="sat-alert sat-alert--danger">{error}</div> : null}
         {renderPage()}
+       </ErrorBoundary>
       </main>
     </div>
   );

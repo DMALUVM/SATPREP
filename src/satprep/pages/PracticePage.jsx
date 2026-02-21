@@ -147,6 +147,12 @@ export default function PracticePage({ onRefreshProgress, progressMetrics }) {
           const selected = useAdaptive && skill === 'all'
             ? buildAdaptivePracticeSet({ progressMetrics, domain, difficulty, count })
             : buildPracticeSet({ domain, skill, difficulty, count });
+          if (!selected.length) {
+            setSessionSummary(null);
+            setSessionQuestions(null);
+            alert('No questions match your current filters. Try adjusting the domain, skill, or difficulty.');
+            return;
+          }
           setSessionQuestions(selected);
         }}
       >
