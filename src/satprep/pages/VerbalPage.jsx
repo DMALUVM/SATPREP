@@ -72,6 +72,18 @@ const VERBAL_SKILL_COACH = {
     'Remove redundancy after grammar is correct.',
     'Prefer the clearest shortest choice that preserves meaning.',
   ],
+  'rhetorical-purpose': [
+    'Ask WHY the author included a detail, not WHAT the detail says.',
+    'Eliminate answers describing content when the question asks about function.',
+  ],
+  'sentence-placement': [
+    'Read the sentence with the one before AND after the proposed position.',
+    'Check that cause comes before effect and setup comes before result.',
+  ],
+  'possessives-contractions': [
+    'Expand contractions mentally: if "it is" fits, use "it\'s" with apostrophe.',
+    'For possessives: "its" (no apostrophe), "their" (not "they\'re" or "there").',
+  ],
 };
 
 function buildDefaultVerbalMetrics() {
@@ -245,7 +257,7 @@ export default function VerbalPage({ progressMetrics, onRefreshProgress }) {
 
       {focusInstructions.length ? (
         <div className="sat-panel" style={{ marginTop: 8 }}>
-          <h3>Today\'s Verbal Coaching Priorities</h3>
+          <h3>Today&apos;s Verbal Coaching Priorities</h3>
           {focusInstructions.map((row) => (
             <article key={row.skill} className="sat-task-card" style={{ marginTop: 10 }}>
               <strong>{row.skill}</strong> (mastery {row.mastery})
