@@ -95,29 +95,37 @@ function getCachedDailyMission(planDate) {
   return cache?.[planDate]?.payload || null;
 }
 
-function buildOfflineMission(planDate) {
+function buildOfflineMission(planDate, targetMinutes = 55) {
+  const totalMin = Math.max(20, Math.min(120, Number(targetMinutes) || 55));
+  const scale = totalMin / 55;
+  const totalQ = Math.max(8, Math.round(24 * scale));
+
   const progress = readStorage(STORAGE.PROGRESS_CACHE, null);
   const progressMetrics = progress?.metrics || null;
   const weakSkills = (progressMetrics?.weak_skills || []).map((row) => row.skill).filter(Boolean);
 
   const questionPool = weakSkills.length
-    ? buildAdaptivePracticeSet({ progressMetrics, count: 24 })
-    : buildPracticeSet({ count: 24, difficulty: 'all', domain: 'all', skill: 'all' });
+    ? buildAdaptivePracticeSet({ progressMetrics, count: totalQ })
+    : buildPracticeSet({ count: totalQ, difficulty: 'all', domain: 'all', skill: 'all' });
 
   const ids = questionPool.map((q) => q.id);
+  const warmupEnd = Math.max(1, Math.round(4 * scale));
+  const drillEnd = warmupEnd + Math.max(2, Math.round(10 * scale));
+  const timedEnd = drillEnd + Math.max(2, Math.round(6 * scale));
+
   const tasks = [
     {
       type: 'warmup',
       label: 'Warmup + Error Recall',
-      target_minutes: 8,
-      question_ids: ids.slice(0, 4),
+      target_minutes: Math.round(8 * scale),
+      question_ids: ids.slice(0, warmupEnd),
       guidance: 'Start with control: identify what is asked, then execute clean setup.',
     },
     {
       type: 'adaptive-drill',
       label: 'Adaptive Drill',
-      target_minutes: 22,
-      question_ids: ids.slice(4, 14),
+      target_minutes: Math.round(22 * scale),
+      question_ids: ids.slice(warmupEnd, drillEnd),
       guidance: weakSkills.length
         ? `Focus your weakest skills first: ${weakSkills.slice(0, 2).join(', ')}.`
         : 'Run mixed medium difficulty with clean setup and speed control.',
@@ -125,15 +133,15 @@ function buildOfflineMission(planDate) {
     {
       type: 'timed-mixed',
       label: 'Timed Mixed Block',
-      target_minutes: 17,
-      question_ids: ids.slice(14, 20),
+      target_minutes: Math.round(17 * scale),
+      question_ids: ids.slice(drillEnd, timedEnd),
       guidance: 'Work at SAT pace. If stuck past 90-95 seconds, eliminate and move.',
     },
     {
       type: 'review-loop',
       label: 'Review + Action Lock',
-      target_minutes: 10,
-      question_ids: ids.slice(20, 24),
+      target_minutes: Math.max(5, totalMin - Math.round(8 * scale) - Math.round(22 * scale) - Math.round(17 * scale)),
+      question_ids: ids.slice(timedEnd),
       guidance: 'Classify misses: concept, setup, or time. Write the next correction action.',
     },
   ];
@@ -143,7 +151,7 @@ function buildOfflineMission(planDate) {
       student_id: null,
       plan_date: planDate,
       tasks,
-      target_minutes: 57,
+      target_minutes: totalMin,
       status: 'offline-ready',
       completion_summary: {
         completed_tasks: 0,
@@ -340,7 +348,7 @@ export async function generateDailyMission(payload = {}) {
       return { ...cached, offline: true, offline_source: 'cached-mission' };
     }
 
-    const offlineMission = buildOfflineMission(planDate);
+    const offlineMission = buildOfflineMission(planDate, payload?.target_minutes);
     cacheDailyMission(planDate, offlineMission);
     return offlineMission;
   }

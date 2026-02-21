@@ -252,7 +252,11 @@ export function generateDailyMission({
   masteryRows = [],
   recentAttempts = [],
   planDate = todayDateString(),
+  targetMinutes = 55,
 }) {
+  const totalMinutes = clamp(Number(targetMinutes) || 55, 20, 120);
+  const scale = totalMinutes / 55;
+
   const mathPool = questionPool.filter((q) => MATH_DOMAINS.has(q.domain));
   const mathSkillSet = new Set(mathPool.map((q) => q.skill));
   const mathMasteryRows = (masteryRows || []).filter((row) => mathSkillSet.has(row.skill));
@@ -280,13 +284,21 @@ export function generateDailyMission({
     .filter((row) => row.due_for_review_at && toTimestamp(row.due_for_review_at) <= Date.now())
     .map((row) => row.skill);
 
-  const reviewQueue = computeReviewQueue(recentAttempts, lookup);
-  const reviewQuestions = randomPick(reviewQueue, 3, used);
+  // Scale question counts by intensity
+  const warmupCount = Math.max(1, Math.round(3 * scale));
+  const weakCount = Math.max(2, Math.round(8 * scale));
+  const secondCount = Math.max(1, Math.round(5 * scale));
+  const timedCoreCount = Math.max(1, Math.round(3 * scale));
+  const timedMaintCount = Math.max(0, Math.round(1 * scale));
+  const timedCap = Math.max(2, Math.round(4 * scale));
 
-  if (reviewQuestions.length < 3 && dueSkills.length) {
+  const reviewQueue = computeReviewQueue(recentAttempts, lookup);
+  const reviewQuestions = randomPick(reviewQueue, warmupCount, used);
+
+  if (reviewQuestions.length < warmupCount && dueSkills.length) {
     const dueSkillFill = chooseQuestionSet(mathPool, {
       skills: dueSkills,
-      count: 3 - reviewQuestions.length,
+      count: warmupCount - reviewQuestions.length,
       excludeIds: used,
       difficultyMin: 1,
       difficultyMax: 5,
@@ -296,7 +308,7 @@ export function generateDailyMission({
 
   const weakQuestions = chooseQuestionSet(mathPool, {
     skills: [weakestSkill, secondSkill].filter(Boolean),
-    count: 8,
+    count: weakCount,
     excludeIds: used,
     difficultyMin: 1,
     difficultyMax: 4,
@@ -305,7 +317,7 @@ export function generateDailyMission({
 
   const secondQuestions = chooseQuestionSet(mathPool, {
     skills: [secondSkill, thirdSkill].filter(Boolean),
-    count: 5,
+    count: secondCount,
     excludeIds: used,
     difficultyMin: 2,
     difficultyMax: 5,
@@ -314,7 +326,7 @@ export function generateDailyMission({
 
   const timedWeakCore = chooseQuestionSet(mathPool, {
     skills: [weakestSkill, secondSkill, thirdSkill].filter(Boolean),
-    count: 3,
+    count: timedCoreCount,
     excludeIds: used,
     difficultyMin: 2,
     difficultyMax: 5,
@@ -322,14 +334,14 @@ export function generateDailyMission({
 
   const timedMaintenance = chooseQuestionSet(mathPool, {
     skills: skillBands.growthSkills,
-    count: 1,
+    count: timedMaintCount,
     excludeIds: used,
     difficultyMin: 2,
     difficultyMax: 5,
   });
 
   const timedFallback = chooseQuestionSet(mathPool, {
-    count: 4,
+    count: timedCap,
     excludeIds: used,
     difficultyMin: 2,
     difficultyMax: 5,
@@ -337,47 +349,53 @@ export function generateDailyMission({
   });
 
   const timedQuestions = [...timedWeakCore, ...timedMaintenance];
-  for (let i = 0; i < timedFallback.length && timedQuestions.length < 4; i += 1) {
+  for (let i = 0; i < timedFallback.length && timedQuestions.length < timedCap; i += 1) {
     timedQuestions.push(timedFallback[i]);
   }
 
-  const remainingReview = reviewQuestions.slice(0, 3);
+  const remainingReview = reviewQuestions.slice(0, warmupCount);
   const adaptiveQuestionCount = weakQuestions.length + secondQuestions.length + timedQuestions.length;
+
+  // Distribute minutes proportionally across blocks
+  const warmupMin = Math.round(9 * scale);
+  const drillMin = Math.round(20 * scale);
+  const timedMin = Math.round(18 * scale);
+  const reviewMin = Math.max(5, totalMinutes - warmupMin - drillMin - timedMin);
 
   const tasks = [
     {
       type: 'warmup',
       label: 'Error Recall Warmup',
       question_ids: remainingReview.map((q) => q.id),
-      target_minutes: 9,
+      target_minutes: warmupMin,
       guidance: 'Re-work recent misses and explain each step out loud.',
     },
     {
       type: 'adaptive-drill',
       label: 'Adaptive Weakness Drill',
       question_ids: [...weakQuestions, ...secondQuestions].map((q) => q.id),
-      target_minutes: 20,
+      target_minutes: drillMin,
       guidance: `Primary focus: ${weakestSkill}. Secondary focus: ${secondSkill}.`,
     },
     {
       type: 'timed-mixed',
       label: 'Timed Mixed Sprint',
       question_ids: timedQuestions.map((q) => q.id),
-      target_minutes: 18,
+      target_minutes: timedMin,
       guidance: 'Target 95 sec/question. Guess strategically and keep moving.',
     },
     {
       type: 'review-lock',
       label: 'Review + Lock-In',
       question_ids: [],
-      target_minutes: 8,
+      target_minutes: reviewMin,
       guidance: 'Write 2 mistakes and 2 rules to apply tomorrow.',
     },
   ];
 
   return {
     plan_date: isoDate(planDate),
-    target_minutes: 55,
+    target_minutes: totalMinutes,
     status: 'pending',
     tasks,
     completion_summary: { completed_tasks: 0, accuracy: 0, pace_seconds: 0 },

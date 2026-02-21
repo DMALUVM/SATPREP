@@ -242,6 +242,12 @@ function SpacedReviewBanner({ today, onStartReview }) {
   );
 }
 
+const INTENSITY_OPTIONS = [
+  { key: 'light', label: 'Light', minutes: 30, description: '~11 questions' },
+  { key: 'standard', label: 'Standard', minutes: 55, description: '~20 questions' },
+  { key: 'extended', label: 'Extended', minutes: 90, description: '~34 questions' },
+];
+
 export default function DailyPage({ onRefreshProgress, progressMetrics, navigate, profile, onUpdateProfile }) {
   const [mission, setMission] = useState(null);
   const [missionMeta, setMissionMeta] = useState(null);
@@ -252,6 +258,7 @@ export default function DailyPage({ onRefreshProgress, progressMetrics, navigate
   const [summary, setSummary] = useState(null);
   const [running, setRunning] = useState(false);
   const [reviewQuestions, setReviewQuestions] = useState(null);
+  const [intensity, setIntensity] = useState('standard');
 
   const today = toDateKey();
   const planDay = getPlanDay(today);
@@ -278,11 +285,13 @@ export default function DailyPage({ onRefreshProgress, progressMetrics, navigate
       .filter(Boolean);
   }, [mission, missionQuestions]);
 
+  const selectedIntensity = INTENSITY_OPTIONS.find((o) => o.key === intensity) || INTENSITY_OPTIONS[1];
+
   async function fetchMission() {
     setBusy(true);
     setError('');
     try {
-      const data = await generateDailyMission({ plan_date: today });
+      const data = await generateDailyMission({ plan_date: today, target_minutes: selectedIntensity.minutes });
       setMission(data.mission);
       setMissionMeta(data.mission_metadata || null);
       setMissionQuestions(data.questions || []);
@@ -384,9 +393,26 @@ export default function DailyPage({ onRefreshProgress, progressMetrics, navigate
         </div>
       ) : null}
 
+      <div style={{ marginTop: 12 }}>
+        <label style={{ fontSize: 13, fontWeight: 600, display: 'block', marginBottom: 6 }}>How much time today?</label>
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+          {INTENSITY_OPTIONS.map((opt) => (
+            <button
+              key={opt.key}
+              type="button"
+              className={`sat-btn ${intensity === opt.key ? 'sat-btn--primary' : 'sat-btn--ghost'}`}
+              style={{ fontSize: 13, padding: '6px 14px' }}
+              onClick={() => setIntensity(opt.key)}
+            >
+              {opt.label} ({opt.minutes} min, {opt.description})
+            </button>
+          ))}
+        </div>
+      </div>
+
       <div className="sat-actions-row" style={{ marginTop: 12 }}>
         <button type="button" className="sat-btn sat-btn--primary" onClick={fetchMission} disabled={busy}>
-          {busy ? 'Generating\u2026' : mission ? 'Regenerate Mission' : 'Generate Today\'s Mission'}
+          {busy ? 'Generating\u2026' : mission ? 'Regenerate Mission' : `Generate ${selectedIntensity.label} Mission`}
         </button>
         {missionQuestionList.length ? (
           <button type="button" className="sat-btn" onClick={() => setRunning(true)}>

@@ -51,6 +51,7 @@ export default async function handler(req, res) {
       masteryRows: masteryRes.data || [],
       recentAttempts: attemptsRes.data || [],
       planDate,
+      targetMinutes: req.body?.target_minutes,
     });
 
     const { data: savedMission, error: missionError } = await service
