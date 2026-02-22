@@ -85,6 +85,12 @@ function NextStepBanner({ hasDiagnostic, mission, missionQuestionCount, phase, n
   } else if (!mission) {
     heading = 'Step 1: Pick Your Time and Generate';
     detail = 'Choose how much time you have today, then press Generate. The app handles everything — math first, then verbal, all in one flow.';
+  } else if (phase === 'math-paused') {
+    heading = 'Resume Your Math Session';
+    detail = 'You paused mid-session. Pick up right where you left off — your progress is saved.';
+  } else if (phase === 'verbal-paused') {
+    heading = 'Resume Your Verbal Session';
+    detail = 'Math is done! Resume your verbal session to complete today\'s mission.';
   } else if (missionQuestionCount > 0 && phase === 'idle') {
     heading = 'Step 2: Start Your Mission';
     detail = `Your mission is ready with ${missionQuestionCount} math questions, then verbal. Press Start below and work straight through — the app handles the transitions.`;
@@ -358,6 +364,14 @@ export default function DailyPage({ onRefreshProgress, progressMetrics, navigate
     return buildVerbalSet({ section: 'mixed', count, difficulty: 'all' });
   }
 
+  // Auto-advance to complete if verbal phase has no questions
+  useEffect(() => {
+    if (phase === 'verbal' && mission && !verbalQuestions.length) {
+      savePhase('complete');
+      clearMissionState();
+    }
+  }, [phase, mission, verbalQuestions]);
+
   async function fetchMission() {
     setBusy(true);
     setError('');
@@ -371,6 +385,9 @@ export default function DailyPage({ onRefreshProgress, progressMetrics, navigate
       setMathSummary(null);
       setVerbalSummary(null);
       setExtraQuestions(null);
+      setExtraMode(null);
+      // Clear old session auto-save so it doesn't conflict with new mission
+      try { window.localStorage.removeItem('satprep.activeSession.v1'); } catch { /* ignore */ }
       // Generate verbal questions up front so they're ready
       const vSet = generateVerbalSet();
       setVerbalQuestions(vSet);
@@ -458,6 +475,8 @@ export default function DailyPage({ onRefreshProgress, progressMetrics, navigate
         onExit={() => setExtraQuestions(null)}
         onFinish={(result) => {
           setExtraQuestions(null);
+          if (extraMode === 'math') setMathSummary(result);
+          else setVerbalSummary(result);
           setExtraMode(null);
           onRefreshProgress?.();
         }}
@@ -480,7 +499,7 @@ export default function DailyPage({ onRefreshProgress, progressMetrics, navigate
           target_minutes: missionMinutes,
           completed_tasks: mission?.tasks?.length || 1,
         }}
-        onExit={() => savePhase('idle')}
+        onExit={() => savePhase('math-paused')}
         onFinish={(result) => {
           setMathSummary(result);
           savePhase('verbal');
@@ -507,7 +526,7 @@ export default function DailyPage({ onRefreshProgress, progressMetrics, navigate
           target_minutes: missionMinutes + verbalMinutes,
           completed_tasks: (mission?.tasks?.length || 1) + 1,
         }}
-        onExit={() => savePhase('idle')}
+        onExit={() => savePhase('verbal-paused')}
         onFinish={(result) => {
           setVerbalSummary(result);
           savePhase('complete');
@@ -583,13 +602,14 @@ export default function DailyPage({ onRefreshProgress, progressMetrics, navigate
             {busy ? 'Generating\u2026' : mission ? 'Regenerate Mission' : `Generate ${selectedIntensity.label} Mission`}
           </button>
         ) : null}
-        {missionQuestionList.length && phase === 'idle' ? (
-          <button type="button" className="sat-btn" onClick={() => savePhase('math')}>
-            {hasPausedSession ? 'Resume' : 'Start'} Mission ({missionQuestionList.length} math + {verbalQuestions.length} verbal Q)
+        {missionQuestionList.length > 0 && (phase === 'idle' || phase === 'math-paused' || phase === 'verbal-paused') ? (
+          <button
+            type="button"
+            className="sat-btn"
+            onClick={() => savePhase(phase === 'verbal-paused' ? 'verbal' : 'math')}
+          >
+            {phase === 'math-paused' || phase === 'verbal-paused' || hasPausedSession ? 'Resume' : 'Start'} Mission ({missionQuestionList.length} math + {verbalQuestions.length} verbal Q)
           </button>
-        ) : null}
-        {phase === 'verbal' && !verbalQuestions.length ? (
-          <span className="sat-muted">No verbal questions available — mission complete.</span>
         ) : null}
       </div>
 

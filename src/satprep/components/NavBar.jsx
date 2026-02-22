@@ -3,13 +3,7 @@ import { SAT_PLAN_TOTAL_DAYS, SAT_TEST_DATE, getPlanDay, toDateKey } from '../li
 
 const STUDENT_LINKS = [
   ['/daily', 'Daily'],
-  ['/diagnostic', 'Diagnostic'],
-  ['/practice', 'Practice'],
-  ['/timed', 'Timed'],
-  ['/review', 'Review'],
-  ['/verbal', 'Verbal 700+'],
   ['/progress', 'Progress'],
-  ['/onboarding', 'Guide'],
 ];
 
 const PARENT_LINKS = [['/parent', 'Parent']];

@@ -1,65 +1,62 @@
-import React, { useEffect, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 
-const STORAGE_KEY = 'satprep.mistakeJournal.v1';
-
-function readJournal() {
-  try {
-    const raw = window.localStorage.getItem(STORAGE_KEY);
-    return raw ? JSON.parse(raw) : [];
-  } catch {
-    return [];
-  }
-}
-
-function writeJournal(entries) {
-  try {
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(entries));
-  } catch {
-    // ignore quota errors
-  }
-}
+const HISTORY_KEY = 'satprep.sessionHistory.v1';
 
 function formatDate(iso) {
   const d = new Date(iso);
   return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
 }
 
+function formatSkill(skill) {
+  return String(skill || 'general').replace(/-/g, ' ');
+}
+
 export default function MistakeJournal() {
-  const [entries, setEntries] = useState(() => readJournal());
   const [expanded, setExpanded] = useState(false);
-  const [newMistake, setNewMistake] = useState('');
-  const [newRule, setNewRule] = useState('');
-  const [newSkill, setNewSkill] = useState('');
 
-  useEffect(() => {
-    writeJournal(entries);
-  }, [entries]);
+  const { todayMistakes, recentMistakes, skillCounts } = useMemo(() => {
+    try {
+      const raw = window.localStorage.getItem(HISTORY_KEY);
+      const history = raw ? JSON.parse(raw) : [];
+      const todayKey = new Date().toISOString().slice(0, 10);
+      const all = [];
 
-  const todayEntries = entries.filter((e) => {
-    const today = new Date().toISOString().slice(0, 10);
-    return e.date?.slice(0, 10) === today;
-  });
+      history.forEach((session) => {
+        (session.missedQuestions || []).forEach((q) => {
+          all.push({
+            id: `${session.id}-${q.id}`,
+            date: session.date,
+            skill: q.skill || 'general',
+            stem: q.stem || '',
+            studentAnswer: q.studentAnswer,
+            correctAnswer: q.correctAnswer,
+            secondsSpent: q.secondsSpent || 0,
+            domain: q.domain || '',
+            difficulty: q.difficulty,
+          });
+        });
+      });
 
-  const recentEntries = entries.slice(-10).reverse();
+      const today = all.filter((m) => m.date?.slice(0, 10) === todayKey);
+      const recent = all.slice(-20).reverse();
 
-  function addEntry() {
-    if (!newMistake.trim() && !newRule.trim()) return;
-    const entry = {
-      id: Date.now(),
-      date: new Date().toISOString(),
-      skill: newSkill.trim() || 'general',
-      mistake: newMistake.trim(),
-      rule: newRule.trim(),
-    };
-    setEntries((prev) => [...prev, entry]);
-    setNewMistake('');
-    setNewRule('');
-    setNewSkill('');
-  }
+      const counts = {};
+      all.forEach((m) => {
+        counts[m.skill] = (counts[m.skill] || 0) + 1;
+      });
 
-  function removeEntry(id) {
-    setEntries((prev) => prev.filter((e) => e.id !== id));
-  }
+      return { todayMistakes: today, recentMistakes: recent, skillCounts: counts };
+    } catch {
+      return { todayMistakes: [], recentMistakes: [], skillCounts: {} };
+    }
+  }, []);
+
+  const totalMistakes = recentMistakes.length;
+  const sortedSkills = Object.entries(skillCounts)
+    .sort(([, a], [, b]) => b - a)
+    .slice(0, 5);
+
+  if (totalMistakes === 0) return null;
 
   return (
     <div className="sat-journal">
@@ -69,85 +66,76 @@ export default function MistakeJournal() {
         onClick={() => setExpanded(!expanded)}
         aria-expanded={expanded}
       >
-        <h3>Mistake Journal</h3>
+        <h3>Mistake Tracker</h3>
         <span className="sat-journal__count">
-          {todayEntries.length} today / {entries.length} total
+          {todayMistakes.length} today / {totalMistakes} tracked
         </span>
         <span className="sat-btn sat-btn--ghost" style={{ padding: '4px 10px', fontSize: 13 }} aria-hidden="true">
           {expanded ? 'Collapse' : 'Expand'}
         </span>
       </button>
 
-      {!expanded ? (
+      {!expanded && todayMistakes.length > 0 ? (
         <p className="sat-muted" style={{ margin: '8px 0 0' }}>
-          After each session, log your mistakes and write prevention rules here. This is required — do not skip it.
+          {todayMistakes.length} missed question{todayMistakes.length !== 1 ? 's' : ''} auto-logged today.
+          {sortedSkills.length > 0
+            ? ` Most missed skill: ${formatSkill(sortedSkills[0][0])} (${sortedSkills[0][1]}x).`
+            : ''}
         </p>
       ) : null}
 
       {expanded ? (
         <>
-          <div className="sat-journal__form">
-            <label>
-              Skill (optional)
-              <input
-                value={newSkill}
-                onChange={(e) => setNewSkill(e.target.value)}
-                placeholder="e.g. quadratics, systems, inference"
-              />
-            </label>
-            <label>
-              Mistake pattern — what went wrong?
-              <textarea
-                value={newMistake}
-                onChange={(e) => setNewMistake(e.target.value)}
-                placeholder="e.g. I forgot to flip the inequality sign when dividing by a negative"
-                rows={2}
-              />
-            </label>
-            <label>
-              Prevention rule — what will you do differently?
-              <textarea
-                value={newRule}
-                onChange={(e) => setNewRule(e.target.value)}
-                placeholder="e.g. Circle all negative divisors before solving and check sign direction"
-                rows={2}
-              />
-            </label>
-            <button type="button" className="sat-btn sat-btn--primary" onClick={addEntry}>
-              Save Entry
-            </button>
-          </div>
+          {sortedSkills.length > 0 ? (
+            <div style={{ marginTop: 10, display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+              {sortedSkills.map(([skill, count]) => (
+                <span key={skill} className="sat-pill sat-pill--neutral">
+                  {formatSkill(skill)} ({count})
+                </span>
+              ))}
+            </div>
+          ) : null}
 
-          {todayEntries.length ? (
+          {todayMistakes.length > 0 ? (
             <div className="sat-journal__section">
-              <h4>Today's Entries</h4>
-              {todayEntries.map((entry) => (
-                <div key={entry.id} className="sat-journal__entry">
+              <h4>Today ({todayMistakes.length})</h4>
+              {todayMistakes.map((m) => (
+                <div key={m.id} className="sat-journal__entry">
                   <div className="sat-journal__entry-header">
-                    <span className="sat-pill sat-pill--neutral">{entry.skill}</span>
-                    <button type="button" className="sat-journal__remove" onClick={() => removeEntry(entry.id)}>&times;</button>
+                    <span className="sat-pill sat-pill--neutral">{formatSkill(m.skill)}</span>
+                    {m.difficulty ? <span className="sat-muted">Diff {m.difficulty}</span> : null}
+                    <span className="sat-muted">{m.secondsSpent}s</span>
                   </div>
-                  {entry.mistake ? <p><strong>Mistake:</strong> {entry.mistake}</p> : null}
-                  {entry.rule ? <p><strong>Rule:</strong> {entry.rule}</p> : null}
+                  {m.stem ? <p style={{ fontSize: 13, margin: '4px 0 0' }}>{m.stem}</p> : null}
+                  {m.studentAnswer != null ? (
+                    <p style={{ fontSize: 12, color: 'var(--sat-danger)', margin: '2px 0 0' }}>
+                      Answered: {m.studentAnswer} | Correct: {m.correctAnswer}
+                    </p>
+                  ) : (
+                    <p style={{ fontSize: 12, color: 'var(--sat-danger)', margin: '2px 0 0' }}>
+                      Unanswered | Correct: {m.correctAnswer}
+                    </p>
+                  )}
                 </div>
               ))}
             </div>
           ) : null}
 
-          {recentEntries.length ? (
+          {recentMistakes.length > todayMistakes.length ? (
             <div className="sat-journal__section">
-              <h4>Recent Entries</h4>
-              {recentEntries.map((entry) => (
-                <div key={entry.id} className="sat-journal__entry">
-                  <div className="sat-journal__entry-header">
-                    <span className="sat-pill sat-pill--neutral">{entry.skill}</span>
-                    <span className="sat-muted">{formatDate(entry.date)}</span>
-                    <button type="button" className="sat-journal__remove" onClick={() => removeEntry(entry.id)}>&times;</button>
+              <h4>Recent History</h4>
+              {recentMistakes
+                .filter((m) => m.date?.slice(0, 10) !== new Date().toISOString().slice(0, 10))
+                .slice(0, 10)
+                .map((m) => (
+                  <div key={m.id} className="sat-journal__entry">
+                    <div className="sat-journal__entry-header">
+                      <span className="sat-pill sat-pill--neutral">{formatSkill(m.skill)}</span>
+                      <span className="sat-muted">{formatDate(m.date)}</span>
+                    </div>
+                    {m.stem ? <p style={{ fontSize: 13, margin: '4px 0 0' }}>{m.stem}</p> : null}
                   </div>
-                  {entry.mistake ? <p><strong>Mistake:</strong> {entry.mistake}</p> : null}
-                  {entry.rule ? <p><strong>Rule:</strong> {entry.rule}</p> : null}
-                </div>
-              ))}
+                ))}
             </div>
           ) : null}
         </>

@@ -22,7 +22,7 @@ function loadSessionState(questionIds) {
     const savedIds = (saved.questionIds || []).join(',');
     const currentIds = questionIds.join(',');
     if (savedIds !== currentIds) return null;
-    if (Date.now() - saved.savedAt > 3 * 60 * 60 * 1000) return null;
+    if (Date.now() - saved.savedAt > 12 * 60 * 60 * 1000) return null;
     // Validate saved index is within bounds
     if (typeof saved.index !== 'number' || saved.index < 0 || saved.index >= questionIds.length) {
       saved.index = 0;
