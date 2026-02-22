@@ -12,8 +12,8 @@ const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
 const MODEL = 'claude-sonnet-4-6-20250514';
 const MAX_TOKENS = 600;
 
-// Rate-limit: max 20 AI explanations per student per day
-const DAILY_LIMIT = 20;
+// Rate-limit: max 60 AI explanations per student per day
+const DAILY_LIMIT = 60;
 
 function buildSystemPrompt(section) {
   const base = `You are an elite SAT tutor. The student answered a question incorrectly. Give a concise, targeted explanation.
