@@ -122,6 +122,9 @@ export default async function handler(req, res) {
       skill,
       domain,
       section,
+      follow_up: isFollowUp,
+      initial_explanation: initialExplanation,
+      conversation,
     } = req.body || {};
 
     if (!stem || studentAnswer === undefined || correctAnswer === undefined) {
@@ -130,24 +133,49 @@ export default async function handler(req, res) {
 
     const client = new Anthropic({ apiKey: ANTHROPIC_API_KEY });
 
+    // Build the messages array — either a fresh explanation or a follow-up conversation
+    let messages;
+
+    if (isFollowUp && initialExplanation && Array.isArray(conversation) && conversation.length) {
+      // Multi-turn follow-up: include the original context, initial explanation, and conversation history
+      messages = [
+        {
+          role: 'user',
+          content: buildUserMessage({ stem, choices, studentAnswer, correctAnswer, skill, domain, section }),
+        },
+        {
+          role: 'assistant',
+          content: initialExplanation,
+        },
+      ];
+
+      // Add conversation history (alternating user/assistant turns)
+      for (const msg of conversation) {
+        messages.push({
+          role: msg.role === 'user' ? 'user' : 'assistant',
+          content: String(msg.content || '').slice(0, 500),
+        });
+      }
+
+      // Ensure the last message is from the user (required by the API)
+      if (messages[messages.length - 1].role !== 'user') {
+        messages.push({ role: 'user', content: 'Can you explain further?' });
+      }
+    } else {
+      // Initial explanation — single turn
+      messages = [
+        {
+          role: 'user',
+          content: buildUserMessage({ stem, choices, studentAnswer, correctAnswer, skill, domain, section }),
+        },
+      ];
+    }
+
     const response = await client.messages.create({
       model: MODEL,
       max_tokens: MAX_TOKENS,
       system: buildSystemPrompt(section || 'math'),
-      messages: [
-        {
-          role: 'user',
-          content: buildUserMessage({
-            stem,
-            choices,
-            studentAnswer,
-            correctAnswer,
-            skill,
-            domain,
-            section,
-          }),
-        },
-      ],
+      messages,
     });
 
     const explanation = response.content
