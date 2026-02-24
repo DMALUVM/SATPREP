@@ -175,17 +175,20 @@ function buildOfflineMission(planDate, targetMinutes = 55) {
 }
 
 const DEFAULT_TIMEOUT_MS = 15000;
+const AI_TIMEOUT_MS = 45000;
 
 async function satFetchRaw(path, options = {}, tokenOverride = null) {
   const token = tokenOverride || await getSatAccessToken();
   if (!token) throw new Error('You are not signed in.');
 
+  const timeoutMs = options.timeout || DEFAULT_TIMEOUT_MS;
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), DEFAULT_TIMEOUT_MS);
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
   try {
+    const { timeout: _timeout, ...fetchOptions } = options;
     const response = await fetch(path, {
-      ...options,
+      ...fetchOptions,
       signal: controller.signal,
       headers: {
         'Content-Type': 'application/json',
@@ -423,6 +426,7 @@ export async function fetchAiExplanation(payload) {
   return satFetch('/api/satprep/ai-explain', {
     method: 'POST',
     body: JSON.stringify(payload),
+    timeout: AI_TIMEOUT_MS,
   });
 }
 
@@ -434,6 +438,7 @@ export async function fetchAiFollowUp(payload) {
   return satFetch('/api/satprep/ai-explain', {
     method: 'POST',
     body: JSON.stringify({ ...payload, follow_up: true }),
+    timeout: AI_TIMEOUT_MS,
   });
 }
 

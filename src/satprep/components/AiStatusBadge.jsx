@@ -23,14 +23,15 @@ export default function AiStatusBadge() {
     }
     withTimeout(
       fetchAiExplanation({ stem: '__ping__', student_answer: '0', correct_answer: '1' }),
-      5000
+      8000
     )
-      .then(() => {
-        cachedResult = true;
-        setEnabled(true);
+      .then((res) => {
+        cachedResult = Boolean(res?.ai_available);
+        setEnabled(cachedResult);
       })
       .catch((err) => {
-        cachedResult = err?.status !== 503 && err?.message !== 'timeout';
+        // 503 = API key missing, timeout = unreachable, 401 = not logged in yet
+        cachedResult = err?.status !== 503 && err?.status !== 401 && err?.message !== 'timeout';
         setEnabled(cachedResult);
       });
   }, []);

@@ -9,8 +9,8 @@ import {
 } from './_lib/supabase.js';
 
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
-const MODEL = 'claude-sonnet-4-6-20250514';
-const MAX_TOKENS = 600;
+const MODEL = 'claude-sonnet-4-6';
+const MAX_TOKENS = 1024;
 
 // Rate-limit: max 60 AI explanations per student per day
 const DAILY_LIMIT = 60;
@@ -97,6 +97,13 @@ export default async function handler(req, res) {
 
   try {
     const user = await requireAuthUser(req);
+
+    // Lightweight health-check: return immediately without calling Anthropic or
+    // touching the rate-limit counter so the front-end badge can probe cheaply.
+    if (req.body?.stem === '__ping__') {
+      return res.status(200).json({ ping: true, ai_available: true });
+    }
+
     const service = getServiceClient();
     const profile = await ensureSatProfile(service, user.id, 'student');
 
