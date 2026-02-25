@@ -981,28 +981,28 @@ const TEMPLATE_REGISTRY = {
 // Algebra ~35%, Advanced Math ~35%, Problem Solving & Data ~15%, Geometry & Trig ~15%
 const TEMPLATE_PLAN = [
   // Algebra (~35% of math)
-  { key: 'linear-equations', count: 22 },
-  { key: 'linear-functions', count: 20 },
-  { key: 'systems', count: 18 },
-  { key: 'inequalities', count: 14 },
+  { key: 'linear-equations', count: 40 },
+  { key: 'linear-functions', count: 35 },
+  { key: 'systems', count: 30 },
+  { key: 'inequalities', count: 25 },
   // Advanced Math (~35% of math)
-  { key: 'quadratics', count: 24 },
-  { key: 'exponents', count: 20 },
-  { key: 'functions', count: 20 },
-  { key: 'polynomials', count: 18 },
-  { key: 'exponential-functions', count: 10 },
+  { key: 'quadratics', count: 40 },
+  { key: 'exponents', count: 35 },
+  { key: 'functions', count: 35 },
+  { key: 'polynomials', count: 30 },
+  { key: 'exponential-functions', count: 20 },
   // Problem Solving & Data Analysis (~15% of math)
-  { key: 'percentages', count: 12 },
-  { key: 'statistics', count: 10 },
-  { key: 'ratios', count: 10 },
-  { key: 'probability', count: 8 },
-  { key: 'data-interpretation', count: 8 },
+  { key: 'percentages', count: 25 },
+  { key: 'statistics', count: 20 },
+  { key: 'ratios', count: 20 },
+  { key: 'probability', count: 18 },
+  { key: 'data-interpretation', count: 18 },
   // Geometry & Trigonometry (~15% of math)
-  { key: 'right-triangles', count: 14 },
-  { key: 'circles', count: 12 },
-  { key: 'area-perimeter', count: 10 },
-  { key: 'trigonometry', count: 12 },
-  { key: 'volume', count: 8 },
+  { key: 'right-triangles', count: 25 },
+  { key: 'circles', count: 22 },
+  { key: 'area-perimeter', count: 20 },
+  { key: 'trigonometry', count: 22 },
+  { key: 'volume', count: 18 },
 ];
 
 function generateTemplateCanonicals() {
@@ -1036,7 +1036,7 @@ export function buildCanonicalQuestionBank() {
   return CANONICAL_CACHE;
 }
 
-export function buildQuestionVariants(variantCountPerTemplateQuestion = 3) {
+export function buildQuestionVariants(variantCountPerTemplateQuestion = 8) {
   if (VARIANT_CACHE) return VARIANT_CACHE;
   const canonicals = buildCanonicalQuestionBank();
   const variants = [];

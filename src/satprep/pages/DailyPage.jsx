@@ -556,6 +556,8 @@ export default function DailyPage({ onRefreshProgress, progressMetrics, navigate
           setMathSummary(null);
           setVerbalSummary(null);
           setReviewQuestions(reviewSet);
+        } else {
+          setError('Could not load review questions. They may have been removed from the question bank. The review queue has been cleared for these items.');
         }
       }} />
 
