@@ -92,11 +92,23 @@ export function buildQuestionLookup(questionPool) {
   return map;
 }
 
+function shuffleArray(arr) {
+  const out = arr.slice();
+  for (let i = out.length - 1; i > 0; i -= 1) {
+    const j = Math.floor(Math.random() * (i + 1));
+    const t = out[i];
+    out[i] = out[j];
+    out[j] = t;
+  }
+  return out;
+}
+
 function randomPick(array, count, used = new Set()) {
+  const shuffled = shuffleArray(array);
   const out = [];
-  for (let i = 0; i < array.length; i += 1) {
+  for (let i = 0; i < shuffled.length; i += 1) {
     if (out.length >= count) break;
-    const q = array[i];
+    const q = shuffled[i];
     if (used.has(q.id)) continue;
     used.add(q.id);
     out.push(q);
@@ -260,6 +272,22 @@ export function generateDailyMission({
   const mathPool = questionPool.filter((q) => MATH_DOMAINS.has(q.domain));
   const mathSkillSet = new Set(mathPool.map((q) => q.skill));
   const mathMasteryRows = (masteryRows || []).filter((row) => mathSkillSet.has(row.skill));
+
+  // Build set of previously-attempted question IDs to avoid repeats across sessions.
+  // We exclude these from normal selection so the student sees fresh questions each day.
+  const previouslyAttempted = new Set();
+  for (let i = 0; i < recentAttempts.length; i += 1) {
+    const a = recentAttempts[i];
+    if (a.question_id) previouslyAttempted.add(a.question_id);
+    if (a.canonical_id) previouslyAttempted.add(a.canonical_id);
+  }
+
+  // Filter out previously-attempted questions from the pool for fresh selection.
+  // Keep original pool for review queue (which intentionally re-shows missed questions).
+  const freshMathPool = mathPool.filter((q) => !previouslyAttempted.has(q.id));
+  // Fall back to full pool if too few fresh questions remain
+  const effectiveMathPool = freshMathPool.length >= 30 ? freshMathPool : mathPool;
+
   const used = new Set();
   const lookup = buildQuestionLookup(mathPool);
   const sortedWeak = weightedSortByWeakness(mathMasteryRows);
@@ -296,7 +324,7 @@ export function generateDailyMission({
   const reviewQuestions = randomPick(reviewQueue, warmupCount, used);
 
   if (reviewQuestions.length < warmupCount && dueSkills.length) {
-    const dueSkillFill = chooseQuestionSet(mathPool, {
+    const dueSkillFill = chooseQuestionSet(effectiveMathPool, {
       skills: dueSkills,
       count: warmupCount - reviewQuestions.length,
       excludeIds: used,
@@ -306,7 +334,7 @@ export function generateDailyMission({
     reviewQuestions.push(...dueSkillFill);
   }
 
-  const weakQuestions = chooseQuestionSet(mathPool, {
+  const weakQuestions = chooseQuestionSet(effectiveMathPool, {
     skills: [weakestSkill, secondSkill].filter(Boolean),
     count: weakCount,
     excludeIds: used,
@@ -315,7 +343,7 @@ export function generateDailyMission({
     excludeSkills: deprioritizedSkills,
   });
 
-  const secondQuestions = chooseQuestionSet(mathPool, {
+  const secondQuestions = chooseQuestionSet(effectiveMathPool, {
     skills: [secondSkill, thirdSkill].filter(Boolean),
     count: secondCount,
     excludeIds: used,
@@ -324,7 +352,7 @@ export function generateDailyMission({
     excludeSkills: deprioritizedSkills,
   });
 
-  const timedWeakCore = chooseQuestionSet(mathPool, {
+  const timedWeakCore = chooseQuestionSet(effectiveMathPool, {
     skills: [weakestSkill, secondSkill, thirdSkill].filter(Boolean),
     count: timedCoreCount,
     excludeIds: used,
@@ -332,7 +360,7 @@ export function generateDailyMission({
     difficultyMax: 5,
   });
 
-  const timedMaintenance = chooseQuestionSet(mathPool, {
+  const timedMaintenance = chooseQuestionSet(effectiveMathPool, {
     skills: skillBands.growthSkills,
     count: timedMaintCount,
     excludeIds: used,
@@ -340,7 +368,7 @@ export function generateDailyMission({
     difficultyMax: 5,
   });
 
-  const timedFallback = chooseQuestionSet(mathPool, {
+  const timedFallback = chooseQuestionSet(effectiveMathPool, {
     count: timedCap,
     excludeIds: used,
     difficultyMin: 2,
@@ -412,6 +440,8 @@ export function generateDailyMission({
       deprioritized_skills: deprioritizedSkills,
       due_review_skill_count: dueSkills.length,
       adaptive_question_count: adaptiveQuestionCount,
+      previously_attempted: previouslyAttempted.size,
+      fresh_pool_size: freshMathPool.length,
       generated_at: new Date().toISOString(),
     },
   };

@@ -43,7 +43,7 @@ export default async function handler(req, res) {
         .select('*')
         .eq('student_id', studentId)
         .order('created_at', { ascending: false })
-        .limit(150),
+        .limit(2000),
     ]);
 
     const mission = generateDailyMission({
