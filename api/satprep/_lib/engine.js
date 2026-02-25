@@ -273,18 +273,25 @@ export function generateDailyMission({
   const mathSkillSet = new Set(mathPool.map((q) => q.skill));
   const mathMasteryRows = (masteryRows || []).filter((row) => mathSkillSet.has(row.skill));
 
-  // Build set of previously-attempted question IDs to avoid repeats across sessions.
-  // We exclude these from normal selection so the student sees fresh questions each day.
-  const previouslyAttempted = new Set();
+  // Build set of previously-attempted question IDs AND canonical IDs to avoid repeats.
+  // We track canonical IDs so that variants of the same question (same problem, different
+  // numbers) are also excluded — seeing alg-lin-001-v1 should exclude alg-lin-001-v2 too.
+  const attemptedIds = new Set();
+  const attemptedCanonicals = new Set();
   for (let i = 0; i < recentAttempts.length; i += 1) {
     const a = recentAttempts[i];
-    if (a.question_id) previouslyAttempted.add(a.question_id);
-    if (a.canonical_id) previouslyAttempted.add(a.canonical_id);
+    if (a.question_id) attemptedIds.add(a.question_id);
+    if (a.canonical_id) attemptedCanonicals.add(a.canonical_id);
   }
 
-  // Filter out previously-attempted questions from the pool for fresh selection.
-  // Keep original pool for review queue (which intentionally re-shows missed questions).
-  const freshMathPool = mathPool.filter((q) => !previouslyAttempted.has(q.id));
+  // Filter out previously-attempted questions AND their sibling variants.
+  // A question is "seen" if its own ID was attempted OR its canonical parent was attempted.
+  const freshMathPool = mathPool.filter((q) => {
+    if (attemptedIds.has(q.id)) return false;
+    const canon = q.canonical_id || q.id;
+    if (attemptedCanonicals.has(canon)) return false;
+    return true;
+  });
   // Fall back to full pool if too few fresh questions remain
   const effectiveMathPool = freshMathPool.length >= 30 ? freshMathPool : mathPool;
 
@@ -440,7 +447,7 @@ export function generateDailyMission({
       deprioritized_skills: deprioritizedSkills,
       due_review_skill_count: dueSkills.length,
       adaptive_question_count: adaptiveQuestionCount,
-      previously_attempted: previouslyAttempted.size,
+      previously_attempted: attemptedIds.size,
       fresh_pool_size: freshMathPool.length,
       generated_at: new Date().toISOString(),
     },

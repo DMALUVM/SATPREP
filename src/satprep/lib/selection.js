@@ -9,21 +9,27 @@ function loadSeenIds() {
     if (!raw) return new Set();
     const parsed = JSON.parse(raw);
     // Keep only the last 2000 IDs to prevent unbounded growth
-    if (Array.isArray(parsed)) return new Set(parsed.slice(-2000));
+    if (Array.isArray(parsed)) return new Set(parsed.slice(-5000));
     return new Set();
   } catch { return new Set(); }
 }
 
 function saveSeenIds(seenSet) {
   try {
-    const arr = [...seenSet].slice(-2000);
+    const arr = [...seenSet].slice(-5000);
     window.localStorage.setItem(SEEN_KEY, JSON.stringify(arr));
   } catch { /* ignore quota errors */ }
 }
 
-export function markQuestionsSeen(questionIds) {
+export function markQuestionsSeen(questions) {
   const seen = loadSeenIds();
-  questionIds.forEach((id) => seen.add(id));
+  questions.forEach((q) => {
+    // Accept both plain IDs (strings) and question objects
+    if (typeof q === 'string') { seen.add(q); return; }
+    if (q?.id) seen.add(q.id);
+    // Also mark the canonical ID so sibling variants are excluded too
+    if (q?.canonical_id) seen.add(q.canonical_id);
+  });
   saveSeenIds(seen);
 }
 
@@ -38,14 +44,20 @@ function shuffle(arr) {
   return out;
 }
 
+function isSeen(seen, q) {
+  if (seen.has(q.id)) return true;
+  if (q.canonical_id && seen.has(q.canonical_id)) return true;
+  return false;
+}
+
 function dedup(pool, minFresh = 0) {
   const seen = loadSeenIds();
-  const unseen = pool.filter((q) => !seen.has(q.id));
+  const unseen = pool.filter((q) => !isSeen(seen, q));
   // If we have enough unseen questions, use those
   if (unseen.length >= minFresh) return unseen;
   // Otherwise, prefer unseen but fill with least-recently-seen
   // (just shuffle the full pool — seen ones go to back)
-  return [...unseen, ...pool.filter((q) => seen.has(q.id))];
+  return [...unseen, ...pool.filter((q) => isSeen(seen, q))];
 }
 
 export function getQuestionById(id) {
@@ -63,14 +75,14 @@ export function buildDiagnosticSet() {
     result.push(...easy, ...medium, ...hard);
   });
   const selected = shuffle(result).slice(0, 24);
-  markQuestionsSeen(selected.map((q) => q.id));
+  markQuestionsSeen(selected);
   return selected;
 }
 
 export function buildTimedSet(count = 44) {
   const pool = dedup(SAT_QUESTION_BANK.filter((q) => q.difficulty >= 2));
   const selected = shuffle(pool).slice(0, count);
-  markQuestionsSeen(selected.map((q) => q.id));
+  markQuestionsSeen(selected);
   return selected;
 }
 
@@ -85,7 +97,7 @@ export function buildPracticeSet({ domain = 'all', skill = 'all', difficulty = '
   }
   pool = dedup(pool, count);
   const selected = shuffle(pool).slice(0, count);
-  markQuestionsSeen(selected.map((q) => q.id));
+  markQuestionsSeen(selected);
   return selected;
 }
 
@@ -113,7 +125,7 @@ export function buildAdaptivePracticeSet({ progressMetrics, domain = 'all', diff
   const maintenanceCount = Math.max(0, count - weakCount);
 
   const selected = [...shuffle(weakPool).slice(0, weakCount), ...shuffle(maintenancePool).slice(0, maintenanceCount)];
-  markQuestionsSeen(selected.map((q) => q.id));
+  markQuestionsSeen(selected);
   return selected;
 }
 
@@ -123,7 +135,7 @@ export function buildReviewSet(progressMetrics, count = 15) {
   if (!weakSkills.length) pool = dedup(SAT_QUESTION_BANK);
   else pool = dedup(SAT_QUESTION_BANK.filter((q) => weakSkills.includes(q.skill)));
   const selected = shuffle(pool).slice(0, count);
-  markQuestionsSeen(selected.map((q) => q.id));
+  markQuestionsSeen(selected);
   return selected;
 }
 

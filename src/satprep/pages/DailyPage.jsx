@@ -6,7 +6,7 @@ import SessionSummary from '../components/SessionSummary';
 import { buildAdaptiveVerbalSet, buildVerbalSet } from '../content/verbalQuestionBank';
 import { generateDailyMission } from '../lib/apiClient';
 import { buildAdaptivePracticeSet, buildPracticeSet, getQuestionById } from '../lib/selection';
-import { getDueReviewIds, getReviewStats } from '../lib/spacedRepetition';
+import { getDueReviewIds, getReviewStats, removeFromQueue } from '../lib/spacedRepetition';
 import { getSupabaseBrowserClient } from '../lib/supabaseBrowser';
 import { friendlyDate, getPhaseForDay, getPlanDay, SAT_PLAN_TOTAL_DAYS, SAT_TEST_DATE, setPlanDates, toDateKey } from '../lib/time';
 
@@ -551,7 +551,11 @@ export default function DailyPage({ onRefreshProgress, progressMetrics, navigate
       </div>
 
       <SpacedReviewBanner today={today} onStartReview={(ids) => {
-        const reviewSet = ids.map(getQuestionById).filter(Boolean);
+        const resolved = ids.map((id) => ({ id, question: getQuestionById(id) }));
+        const reviewSet = resolved.filter((r) => r.question).map((r) => r.question);
+        const orphanedIds = resolved.filter((r) => !r.question).map((r) => r.id);
+        // Clean up orphaned IDs so they don't clog the queue permanently
+        if (orphanedIds.length) removeFromQueue(orphanedIds);
         if (reviewSet.length) {
           setMathSummary(null);
           setVerbalSummary(null);

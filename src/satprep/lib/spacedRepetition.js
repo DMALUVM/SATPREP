@@ -128,6 +128,16 @@ export function getDueReviewIds(today) {
 }
 
 /**
+ * Remove question IDs from the queue (e.g. when questions no longer exist in the bank).
+ */
+export function removeFromQueue(questionIds) {
+  if (!Array.isArray(questionIds) || !questionIds.length) return;
+  const queue = readQueue();
+  questionIds.forEach((id) => { delete queue[id]; });
+  writeQueue(queue);
+}
+
+/**
  * Get summary stats for the review queue.
  */
 export function getReviewStats() {

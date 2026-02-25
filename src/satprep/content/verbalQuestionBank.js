@@ -1572,29 +1572,39 @@ function loadSeenIds() {
     const raw = window.localStorage.getItem(SEEN_KEY);
     if (!raw) return new Set();
     const parsed = JSON.parse(raw);
-    if (Array.isArray(parsed)) return new Set(parsed.slice(-2000));
+    if (Array.isArray(parsed)) return new Set(parsed.slice(-5000));
     return new Set();
   } catch { return new Set(); }
 }
 
 function saveSeenIds(seenSet) {
   try {
-    const arr = [...seenSet].slice(-2000);
+    const arr = [...seenSet].slice(-5000);
     window.localStorage.setItem(SEEN_KEY, JSON.stringify(arr));
   } catch { /* ignore */ }
 }
 
-function markSeen(ids) {
+function markSeen(items) {
   const seen = loadSeenIds();
-  ids.forEach((id) => seen.add(id));
+  items.forEach((item) => {
+    if (typeof item === 'string') { seen.add(item); return; }
+    if (item?.id) seen.add(item.id);
+    if (item?.canonical_id) seen.add(item.canonical_id);
+  });
   saveSeenIds(seen);
+}
+
+function isSeen(seen, q) {
+  if (seen.has(q.id)) return true;
+  if (q.canonical_id && seen.has(q.canonical_id)) return true;
+  return false;
 }
 
 function dedup(pool, minFresh = 0) {
   const seen = loadSeenIds();
-  const unseen = pool.filter((q) => !seen.has(q.id));
+  const unseen = pool.filter((q) => !isSeen(seen, q));
   if (unseen.length >= minFresh) return unseen;
-  return [...unseen, ...pool.filter((q) => seen.has(q.id))];
+  return [...unseen, ...pool.filter((q) => isSeen(seen, q))];
 }
 
 export function buildVerbalSet({ section = 'mixed', count = 20, difficulty = 'all' } = {}) {
@@ -1611,7 +1621,7 @@ export function buildVerbalSet({ section = 'mixed', count = 20, difficulty = 'al
 
   pool = dedup(pool, count);
   const selected = shuffle(mulberry32(hashString(`${section}-${count}-${difficulty}-${Date.now()}`)), pool).slice(0, count);
-  markSeen(selected.map((q) => q.id));
+  markSeen(selected);
   return selected;
 }
 
@@ -1663,6 +1673,6 @@ export function buildAdaptiveVerbalSet({
   }
 
   const result = selected.slice(0, count);
-  markSeen(result.map((q) => q.id));
+  markSeen(result);
   return result;
 }
